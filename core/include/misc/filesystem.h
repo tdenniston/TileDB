@@ -40,6 +40,7 @@
 #include <string>
 #include <vector>
 
+#include "buffer.h"
 #include "status.h"
 #include "uri.h"
 
@@ -126,6 +127,9 @@ Status delete_dir(const uri::URI& path);
  */
 Status file_size(const std::string& path, off_t* size);
 
+Status delete_file(const uri::URI& path);
+
+// TODO: jcb remove
 Status delete_file(const std::string& path);
 
 /** Returns the names of the directories inside the input directory.
@@ -173,18 +177,18 @@ void purge_dots_from_path(std::string& path);
  * @return TILEDB_UT_OK on success and TILEDB_UT_ERR on error.
  */
 Status read_from_file(
-    const std::string& path, off_t offset, void* buffer, size_t length);
+    const uri::URI& path, off_t offset, void* buffer, size_t length);
 
 /**
  * Read contents of a file into a (growable) byte buffer.
  *
- * @param path  The name of a file.
+ * @param path  The identifier of a file.
  * @param buffer A pointer to the allocated buffer
  * @param buffer_size The number of bytes allocated to hold the buffer
  * @return Status
  */
 Status read_from_file(
-    const std::string& path, char* buffer, size_t* buffer_size);
+    const uri::URI& path, Buffer* buffer);
 
 // TODO: this should go away
 /** Returns the names of the fragments inside the input directory. */
@@ -266,6 +270,10 @@ Status sync(const std::string& path);
 Status write_to_file(
     const std::string& path, const void* buffer, size_t buffer_size);
 
+// TODO: jcb
+Status write_to_file(
+    const uri::URI& path, const Buffer* buff);
+
 /**
  * Read from a GZIP compressed file.
  * @param path The path of the gzip file.
@@ -277,7 +285,7 @@ Status write_to_file(
  */
 Status read_from_gzipfile(
     const std::string& path,
-    void* buffer,
+    Buffer* buffer,
     unsigned int size,
     int* decompressed_size);
 
@@ -289,7 +297,7 @@ Status read_from_gzipfile(
  * @return  Status
  */
 Status write_to_gzipfile(
-    const std::string& path, const void* buffer, size_t buffer_size);
+    const std::string& path, Buffer* buffer, size_t buffer_size);
 
 #ifdef HAVE_MPI
 /**

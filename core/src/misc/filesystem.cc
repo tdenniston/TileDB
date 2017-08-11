@@ -115,6 +115,12 @@ Status delete_dir(const std::string& path) {
   return Status::Ok();
 }
 
+// TODO: jcb this should be removed and used in the system vfs backend
+Status delete_file(const uri::URI& uri) {
+  return delete_file(uri.to_posix_path());
+}
+
+// TODO: jcb this should be removed and used in the system vfs backend
 Status delete_file(const std::string& path) {
   if (remove(path.c_str())) {
     return LOG_STATUS(
@@ -391,19 +397,19 @@ Status read_from_file(
 }
 
 Status read_from_file(
-    const std::string& path, char* buffer, size_t* buffer_size) {
-  *buffer_size = 0;
-  std::ifstream file(path, std::ios::in | std::ios::binary | std::ios::ate);
+    const uri::URI& path, Buffer* buffer) {
+  std::ifstream file(path.to_posix_path(), std::ios::in | std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
     return LOG_STATUS(Status::OSError(
-        std::string("Cannot read file '") + path + "': file open error"));
+        std::string("Cannot read file '") + path.to_string() + "': file open error"));
   }
   std::streampos nbytes = file.tellg();
-  buffer = new char[nbytes];
+
+  buffer = new Buffer(nbytes);
   file.seekg(0, std::ios::beg);
-  file.read(buffer, nbytes);
+  file.read(buffer->data(), nbytes);
   file.close();
-  *buffer_size = nbytes;
+
   return Status::Ok();
 }
 
@@ -570,6 +576,12 @@ Status sync(const std::string& path) {
 
   // Success
   return Status::Ok();
+}
+
+// TODO: jcb
+Status write_to_file(
+    const uri::URI& path, const Buffer* buff) {
+  return write_to_file(path.to_posix_path(), buff->data(), buff->size());
 }
 
 Status write_to_file(

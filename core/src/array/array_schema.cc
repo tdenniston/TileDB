@@ -416,17 +416,10 @@ bool ArraySchema::is_contained_in_tile_slab_row(const void* range) const {
 // type#1(char) type#2(char) ...
 // cell_val_num#1(unsigned int) cell_val_num#2(unsigned int) ...
 // compression#1(char) compression#2(char) ...
-Status ArraySchema::serialize(
-    void*& array_schema_bin, size_t& array_schema_bin_size) const {
-  // Compute the size of the binary representation of the ArraySchema object
-  array_schema_bin_size = compute_bin_size();
-
-  // Allocate memory
-  array_schema_bin = malloc(array_schema_bin_size);
-
+Status ArraySchema::serialize(const Buffer* buff) const {
   // For easy reference
-  char* buffer = (char*)array_schema_bin;
-  size_t buffer_size = array_schema_bin_size;
+  char* buffer = buff->data();
+  size_t buffer_size = buff->size();
   size_t offset = 0;
 
   // Copy array_name_
@@ -535,43 +528,35 @@ Status ArraySchema::serialize(
   return Status::Ok();
 }
 
-// TODO: jcb
-Status ArraySchema::store(const uri::URI& parent, const char* schema) {
-  return ArraySchema::store(parent.to_string(), schema);
-}
 
-Status ArraySchema::store(const std::string& dir, const char* schema_filename) {
+Status ArraySchema::store(const uri::URI& parent, const char* schema) {
   // Initialize array schema
   RETURN_NOT_OK(init());
 
   // Open array schema file
-  std::string filename = dir + "/" + schema_filename;
-  remove(filename.c_str());
-  int fd = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_SYNC, S_IRWXU);
-  if (fd == -1)
-    return LOG_STATUS(Status::ArraySchemaError(
-        std::string("Cannot store schema; ") + strerror(errno)));
+  uri::URI schema_uri = parent.join_path(schema);
+  RETURN_NOT_OK(filesystem::delete_file(schema_uri));
 
-  // Serialize array schema
-  void* array_schema_bin;
-  size_t array_schema_bin_size;
-  RETURN_NOT_OK(serialize(array_schema_bin, array_schema_bin_size));
-
-  // Store the array schema
-  ssize_t bytes_written = ::write(fd, array_schema_bin, array_schema_bin_size);
-  if (bytes_written != ssize_t(array_schema_bin_size)) {
-    free(array_schema_bin);
+  Status st;
+  st = filesystem::create_empty_file(schema_uri.to_posix_path());
+  if (!st.ok()) {
     return LOG_STATUS(Status::ArraySchemaError(
-        std::string("Cannot store schema; ") + strerror(errno)));
+        std::string("Cannot store schema: could not create schema file")));
   }
-
-  // Clean up
-  free(array_schema_bin);
-  if (::close(fd))
+  // Serialize array schema
+  auto buff = new Buffer(compute_buffer_size());
+  st = serialize(buff);
+  if (!st.ok()) {
+    delete buff;
+    return st;
+  }
+  // Store the array schema
+  st = filesystem::write_to_file(schema_uri, buff);
+  if (!st.ok()) {
+    delete buff;
     return LOG_STATUS(Status::ArraySchemaError(
-        std::string("Cannot store schema; ") + strerror(errno)));
-
-  // Success
+        std::string("Cannot store schema; ").append(st.message())));
+  }
   return Status::Ok();
 }
 
@@ -849,11 +834,11 @@ void ArraySchema::add_dimension(const Dimension* dim) {
 // type#1(char) type#2(char) ...
 // cell_val_num#1(unsigned int) cell_val_num#2(unsigned int) ...
 // compression#1(char) compression#2(char) ...
-Status ArraySchema::deserialize(
-    const void* array_schema_bin, size_t array_schema_bin_size) {
+Status ArraySchema::deserialize(const Buffer* buff) {
   // For easy reference
-  const char* buffer = static_cast<const char*>(array_schema_bin);
-  size_t buffer_size = array_schema_bin_size;
+  const char* buffer = buff->data();
+  // TODO: use one size type!!!!!!!
+  size_t buffer_size = static_cast<size_t>(buff->size());
   size_t offset = 0;
 
   // Load array_name_
@@ -1109,56 +1094,23 @@ Status ArraySchema::init() {
   return Status::Ok();
 }
 
-// TODO: uri
 Status ArraySchema::load(const uri::URI& parent, const char* schema) {
-  return ArraySchema::load(parent.to_string(), schema);
-}
-
-// TODO: uri
-Status ArraySchema::load(const std::string& dir, const char* schema_filename) {
-  // Get real array path
-  std::string real_dir = filesystem::real_dir(dir);
+  uri::URI schema_uri = parent.join_path(schema);
 
   // Open array schema file
-  std::string filename = real_dir + "/" + schema_filename;
-  int fd = ::open(filename.c_str(), O_RDONLY);
-  if (fd == -1)
-    return LOG_STATUS(
-        Status::ArraySchemaError("Cannot load schema; File opening error"));
-
-  // Initialize buffer
-  struct stat _stat;
-  fstat(fd, &_stat);
-  ssize_t buffer_size = _stat.st_size;
-
-  if (buffer_size == 0)
-    return LOG_STATUS(Status::ArraySchemaError(
-        "Cannot load array schema; Empty array schema file"));
-  void* buffer = malloc(buffer_size);
-
-  // Load array schema
-  ssize_t bytes_read = ::read(fd, buffer, buffer_size);
-  if (bytes_read != buffer_size) {
-    free(buffer);
-    return LOG_STATUS(Status::ArraySchemaError(
-        "Cannot load array schema; File reading error"));
-  }
-
-  // Initialize array schema
-  Status st = deserialize(buffer, buffer_size);
+  Buffer* buff = nullptr;
+  Status st = filesystem::read_from_file(schema_uri, buff);
   if (!st.ok()) {
-    free(buffer);
-    return st;
+    delete buff;
+    return LOG_STATUS(Status::ArraySchemaError(std::string("Cannot load schema; ").append(st.message())));
   }
-
-  // Clean up
-  free(buffer);
-  if (::close(fd))
-    return LOG_STATUS(Status::ArraySchemaError(
-        "Cannot load array schema; File closing error"));
-
-  // Success
-  return Status::Ok();
+  if (buff->size() == 0) {
+    delete buff;
+    return LOG_STATUS(Status::ArraySchemaError("Cannot load schema; empty array schema file"));
+  }
+  st = deserialize(buff);
+  delete buff;
+  return st;
 }
 
 void ArraySchema::set_array_uri(const uri::URI& uri) {
@@ -1520,40 +1472,40 @@ void ArraySchema::clear() {
 // type#1(char) type#2(char) ...
 // cell_val_num#1(int) cell_val_num#2(int) ...
 // compression#1(char) compression#2(char) ...
-size_t ArraySchema::compute_bin_size() const {
+size_t ArraySchema::compute_buffer_size() const {
   // Initialization
-  size_t bin_size = 0;
+  size_t buf_size = 0;
 
   // Size for array_name_
-  bin_size += sizeof(int) + array_uri_.size();
+  buf_size += sizeof(int) + array_uri_.size();
   // Size for dense_
-  bin_size += sizeof(bool);
+  buf_size += sizeof(bool);
   // Size for tile_order_ and cell_order_
-  bin_size += 2 * sizeof(char);
+  buf_size += 2 * sizeof(char);
   // Size for capacity_
-  bin_size += sizeof(int64_t);
+  buf_size += sizeof(int64_t);
   // Size for attribute_num_ and attributes_
-  bin_size += sizeof(int);
+  buf_size += sizeof(int);
   for (int i = 0; i < attribute_num_; ++i)
-    bin_size += sizeof(int) + attributes_[i].size();
+    buf_size += sizeof(int) + attributes_[i].size();
   // Size for dim_num and dimensions_
-  bin_size += sizeof(int);
+  buf_size += sizeof(int);
   for (int i = 0; i < dim_num_; ++i)
-    bin_size += sizeof(int) + dimensions_[i].size();
+    buf_size += sizeof(int) + dimensions_[i].size();
   // Size for domain_
-  bin_size += sizeof(int) + 2 * coords_size();
+  buf_size += sizeof(int) + 2 * coords_size();
   // Size for tile_extents_
-  bin_size += sizeof(int) + ((tile_extents_ == nullptr) ? 0 : coords_size());
+  buf_size += sizeof(int) + ((tile_extents_ == nullptr) ? 0 : coords_size());
   // Size for types_
-  bin_size += (attribute_num_ + 1) * sizeof(char);
+  buf_size += (attribute_num_ + 1) * sizeof(char);
   // Size for cell_val_num_
-  bin_size += attribute_num_ * sizeof(unsigned int);
+  buf_size += attribute_num_ * sizeof(unsigned int);
   // Size for compressor_
-  bin_size += (attribute_num_ + 1) * sizeof(char);
+  buf_size += (attribute_num_ + 1) * sizeof(char);
   // Size for compression_level_
-  bin_size += (attribute_num_ + 1) * sizeof(int);
+  buf_size += (attribute_num_ + 1) * sizeof(int);
 
-  return bin_size;
+  return buf_size;
 }
 
 void ArraySchema::compute_cell_num_per_tile() {

@@ -39,6 +39,7 @@
 #include <vector>
 #include "array_type.h"
 #include "attribute.h"
+#include "buffer.h"
 #include "compressor.h"
 #include "configurator.h"
 #include "datatype.h"
@@ -217,14 +218,10 @@ class ArraySchema {
   /**
    * Serializes the array schema object into a binary buffer.
    *
-   * @param array_schema_bin The binary buffer to be created and populated
-   *     by the function with the object data. Note that the caller is
-   *     responsible for releasing this buffer afterwards.
-   * @param array_schema_bin_size The size of the created binary buffer.
+   * @param buff A pointer to an initialized TileDB Buffer object
    * @return Status
    */
-  Status serialize(
-      void*& array_schema_bin, size_t& array_schema_bin_size) const;
+  Status serialize(const Buffer* buff) const;
 
   /**
    * Returns the type of overlap of the input subarrays.
@@ -321,8 +318,7 @@ class ArraySchema {
    * @param array_schema_bin_size The size of the input binary buffer.
    * @return Status
    */
-  Status deserialize(
-      const void* array_schema_bin, size_t array_schema_bin_size);
+  Status deserialize(const Buffer* buff);
 
   /**
    * Initializes the ArraySchema object. It also performs a check to see if
@@ -335,15 +331,10 @@ class ArraySchema {
   /**
    * Loads the schema of an array from the disk.
    *
-   * @param dir The directory of the array.
+   * @param uri The resource identifier of the array
    * @param schema_filename The schema file name.
    * @return Status
    */
-  Status load(
-      const std::string& dir,
-      const char* schema_filename = Configurator::array_schema_filename());
-
-  // TODO: uri
   Status load(
       const uri::URI& uri,
       const char* schema_filename = Configurator::array_schema_filename());
@@ -747,7 +738,7 @@ class ArraySchema {
    * Computes and returns the size of the binary representation of the
    * ArraySchema object.
    */
-  size_t compute_bin_size() const;
+  size_t compute_buffer_size() const;
 
   /**
    * Compute the number of cells per tile. Meaningful only for the **dense**

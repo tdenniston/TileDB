@@ -116,13 +116,13 @@ void MetadataSchema::add_attribute(const Attribute* attr) {
   array_schema_->add_attribute(attr);
 }
 
-Status MetadataSchema::load(const char* metadata_name) {
+Status MetadataSchema::load(const uri::URI& metadata_uri) {
   if (array_schema_ != nullptr)
     delete array_schema_;
 
   array_schema_ = new ArraySchema();
   return array_schema_->load(
-      metadata_name, Configurator::metadata_schema_filename());
+      metadata_uri, Configurator::metadata_schema_filename());
 }
 
 void MetadataSchema::set_capacity(uint64_t capacity) {

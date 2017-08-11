@@ -50,7 +50,7 @@ Buffer::Buffer() {
 }
 
 Buffer::Buffer(uint64_t size) {
-  data_ = malloc(size);
+  data_ = new char[size];
   size_ = (data_ != nullptr) ? size : 0;
   size_alloced_ = size_;
   offset_ = 0;
@@ -58,7 +58,7 @@ Buffer::Buffer(uint64_t size) {
 
 Buffer::~Buffer() {
   if (data_ != nullptr)
-    free(data_);
+    delete[] data_;
 }
 
 /* ****************************** */
@@ -66,7 +66,7 @@ Buffer::~Buffer() {
 /* ****************************** */
 
 void Buffer::realloc(uint64_t size) {
-  data_ = ::realloc(data_, size);
+  data_ = static_cast<char*>(std::realloc(data_, size));
   size_alloced_ = size;
 }
 
@@ -84,6 +84,13 @@ void Buffer::write(ConstBuffer* buf, uint64_t bytes) {
     realloc(2 * size_alloced_);
 
   buf->read(data_, bytes);
+  offset_ += bytes;
+}
+
+void Buffer::write(const void* data, uint64_t bytes) {
+  while (offset_ + bytes > size_alloced_)
+    realloc(2  * size_alloced_);
+  memcpy(((char*)data_ + offset_), data, bytes);
   offset_ += bytes;
 }
 

@@ -113,10 +113,10 @@ class MetadataSchema {
   /**
    * Loads the metadata schema from the disk.
    *
-   * @param metadata_name The name of the metadata whose scheme will be loaded.
+   * @param metadata_uri The URI of the metadata whose scheme will be loaded.
    * @return Status
    */
-  Status load(const char* metadata_name);
+  Status load(const uri::URI& metadata_uri);
 
   /** Sets the capacity. */
   void set_capacity(uint64_t capacity);

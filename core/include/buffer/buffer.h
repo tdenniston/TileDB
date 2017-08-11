@@ -55,7 +55,7 @@ class Buffer {
   /*                API                */
   /* ********************************* */
 
-  inline void* data() const {
+  inline char* data() const {
     return data_;
   }
 
@@ -106,12 +106,14 @@ class Buffer {
 
   void write(ConstBuffer* buf, uint64_t bytes);
 
+  void write(const void* data, uint64_t bytes);
+
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
   /* ********************************* */
 
-  void* data_;
+  char* data_;
 
   uint64_t offset_;
 

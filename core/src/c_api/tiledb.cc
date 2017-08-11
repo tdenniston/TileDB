@@ -853,7 +853,6 @@ int tiledb_array_schema_load(
   (*array_schema)->array_schema_ = new tiledb::ArraySchema();
   if ((*array_schema)->array_schema_ == nullptr) {
     free(*array_schema);
-    *array_schema = nullptr;
     save_error(
         ctx,
         tiledb::Status::Error(
@@ -861,10 +860,10 @@ int tiledb_array_schema_load(
     return TILEDB_OOM;
   }
   // Load array schema
-  if (save_error(ctx, (*array_schema)->array_schema_->load(array_name))) {
+  auto array_uri = tiledb::uri::URI(array_name);
+  if (save_error(ctx, (*array_schema)->array_schema_->load(array_uri))) {
     delete (*array_schema)->array_schema_;
     free(*array_schema);
-    *array_schema = nullptr;
     return TILEDB_ERR;
   }
   return TILEDB_OK;
@@ -1674,8 +1673,9 @@ int tiledb_metadata_schema_load(
   }
 
   // Load metadata schema
+  auto metadata_uri = tiledb::uri::URI(metadata_name);
   if (save_error(
-          ctx, (*metadata_schema)->metadata_schema_->load(metadata_name))) {
+          ctx, (*metadata_schema)->metadata_schema_->load(metadata_uri))) {
     delete (*metadata_schema)->metadata_schema_;
     free(*metadata_schema);
     *metadata_schema = nullptr;

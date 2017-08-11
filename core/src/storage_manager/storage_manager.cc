@@ -503,24 +503,23 @@ Status StorageManager::metadata_load_schema(
         std::string("Cannot load metadata schema; Metadata '") +
         metadata_uri.to_string() + "' does not exist"));
   }
-  auto metadata_schema_path =
+  auto metadata_schema_uri =
       metadata_uri.join_path(Configurator::metadata_schema_filename());
 
-  char* buffer = nullptr;
+  Buffer* buffer;
   size_t buffer_size = 0;
   RETURN_NOT_OK(filesystem::read_from_file(
-      metadata_schema_path.to_posix_path(), buffer, &buffer_size));
+      metadata_schema_uri, buffer));
 
   // Initialize array schema
   array_schema = new ArraySchema();
-  Status st = array_schema->deserialize(buffer, buffer_size);
+  Status st = array_schema->deserialize(buffer);
 
   // cleanup
   delete buffer;
   if (!st.ok()) {
     delete array_schema;
   }
-
   return st;
 }
 
