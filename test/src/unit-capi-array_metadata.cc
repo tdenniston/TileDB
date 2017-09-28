@@ -44,8 +44,9 @@
 
 struct ArraySchemaFx {
   // Constant parameters
-  const std::string URI_PREFIX = "file://";
+  const std::string URI_PREFIX = "hdfs://";
   const std::string GROUP = "test_group/";
+  const std::string HADOOP = "/Users/jacobbolewski/Hadoop/hadoop/hadoop-dist/target/hadoop-2.8.1/bin/hadoop";
   const std::string ARRAY_NAME = "dense_test_100x100_10x10";
   tiledb_array_type_t ARRAY_TYPE = TILEDB_DENSE;
   const char* ARRAY_TYPE_STR = "dense";
@@ -100,10 +101,10 @@ struct ArraySchemaFx {
     // Create group, delete it if it already exists
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = "test -d " + GROUP;
+    std::string cmd = HADOOP + " fs -test -d " + GROUP;
     rc = system(cmd.c_str());
     if (rc == 0) {
-      cmd = "rm -rf " + GROUP;
+      cmd = HADOOP + " fs -rm -r -f " + GROUP;
       rc = system(cmd.c_str());
       assert(rc == 0);
     }
@@ -122,7 +123,7 @@ struct ArraySchemaFx {
     // Remove the temporary group
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = "rm -rf " + GROUP;
+    std::string cmd = HADOOP + " fs -rm -r -f " + GROUP;
     int rc = system(cmd.c_str());
     assert(rc == 0);
   }
@@ -179,7 +180,7 @@ struct ArraySchemaFx {
 TEST_CASE_METHOD(
     ArraySchemaFx,
     "C API: Test array metadata creation and retrieval",
-    "[capi]") {
+    "[metadata]") {
   create_dense_array();
 
   // Load array_metadata metadata from the disk

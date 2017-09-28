@@ -53,9 +53,11 @@ struct SparseArrayFx {
   int COMPRESSION_LEVEL = -1;
 
   // Workspace folder name
-  const std::string URI_PREFIX = "file://";
+  const std::string URI_PREFIX = "hdfs://";
+  const std::string TEMP_DIR = "/tiledb/";
   const std::string GROUP = "my_group/";
-
+  
+  const std::string HADOOP = "/Users/jacobbolewski/Hadoop/hadoop/hadoop-dist/target/hadoop-2.8.1/bin/hadoop";
   // Array name
   std::string array_name_;
 
@@ -73,14 +75,14 @@ struct SparseArrayFx {
     // Create group, delete it if it already exists
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = "test -d " + GROUP;
+    std::string cmd = HADOOP + " fs -test -d " + TEMP_DIR + GROUP;
     rc = system(cmd.c_str());
     if (rc == 0) {
-      cmd = "rm -rf " + GROUP;
+      cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
       rc = system(cmd.c_str());
       assert(rc == 0);
     }
-    rc = tiledb_group_create(ctx_, (URI_PREFIX + GROUP).c_str());
+    rc = tiledb_group_create(ctx_, (URI_PREFIX + TEMP_DIR + GROUP).c_str());
     assert(rc == TILEDB_OK);
   }
 
@@ -91,7 +93,7 @@ struct SparseArrayFx {
     // Remove the temporary group
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = "rm -rf " + GROUP;
+    std::string cmd = HADOOP + " -rm -r -f " + TEMP_DIR + GROUP;
     int rc = system(cmd.c_str());
     assert(rc == 0);
   }
@@ -261,7 +263,7 @@ struct SparseArrayFx {
 
   /** Sets the array name for the current test. */
   void set_array_name(const char* name) {
-    array_name_ = URI_PREFIX + GROUP + name;
+    array_name_ = URI_PREFIX + TEMP_DIR + GROUP + name;
   }
 
   /**
@@ -392,7 +394,7 @@ struct SparseArrayFx {
  * width and height of the sub-regions
  */
 TEST_CASE_METHOD(
-    SparseArrayFx, "C API: Test random sparse sorted reads", "[capi]") {
+    SparseArrayFx, "C API: Test random sparse sorted reads", "[sparse]") {
   // error code
   int rc;
 

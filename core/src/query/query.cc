@@ -311,6 +311,7 @@ Status Query::overflow(
 
 Status Query::read() {
   // Handle case of no fragments
+  std::cout << "DEBUG Query read() beign \n";
   if (fragments_.empty()) {
     zero_out_buffer_sizes(buffer_sizes_);
     status_ = QueryStatus::COMPLETED;
@@ -336,6 +337,7 @@ Status Query::read() {
     status_ = QueryStatus::FAILED;
   }
 
+  std::cout << "DEBUG Query read() end \n";
   return st;
 }
 
@@ -381,11 +383,13 @@ QueryType Query::type() const {
 
 Status Query::write() {
   status_ = QueryStatus::INPROGRESS;
-
+  std::cout << "DEBUG Query write() begin \n";
   // Write based on mode
   if (layout_ == Layout::COL_MAJOR || layout_ == Layout::ROW_MAJOR) {
+    std::cout << "DEBUG Query write() COL_MAJOR ROW_MAJOR \n";
     RETURN_NOT_OK(array_sorted_write_state_->write(buffers_, buffer_sizes_));
   } else if (layout_ == Layout::GLOBAL_ORDER || layout_ == Layout::UNORDERED) {
+    std::cout << "DEBUG Query write() GLOBAL UNORDERED \n";
     RETURN_NOT_OK(write(buffers_, buffer_sizes_));
   } else {
     assert(0);
@@ -396,6 +400,8 @@ Status Query::write() {
     clear_fragments();
 
   status_ = QueryStatus::COMPLETED;
+  
+  std::cout << "DEBUG Query write() end \n";
 
   return Status::Ok();
 }
@@ -420,7 +426,8 @@ Status Query::write(void** buffers, uint64_t* buffer_sizes) {
     fragments_.push_back(fragment);
     RETURN_NOT_OK(fragment->init(URI(new_fragment_name), subarray_));
   }
-
+  
+  std::cout << "DEBUG Query write( fragments_write  " << fragments_[0]->fragment_uri().to_string() <<  " ) \n";
   // Dispatch the write command to the new fragment
   RETURN_NOT_OK(fragments_[0]->write(buffers, buffer_sizes));
 

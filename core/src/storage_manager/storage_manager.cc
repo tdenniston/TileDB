@@ -157,10 +157,16 @@ Status StorageManager::load(
   if (array_uri.is_invalid())
     return LOG_STATUS(Status::StorageManagerError(
         "Cannot load array metadata; Invalid array URI"));
-
+  
+  std::cout << "DEBUG: array_uri: " << array_uri.to_string() << std::endl; 
   URI array_metadata_uri =
       array_uri.join_path(constants::array_metadata_filename);
 
+  uint64_t buffer_size = 0;
+  std::cout << "DEBUG: array_metadata_uri = " << array_metadata_uri.to_string() << std::endl;
+  RETURN_NOT_OK(file_size(array_metadata_uri, &buffer_size));
+  
+  std::cout << "DEBUG: Buffer size = " << buffer_size << std::endl;
   // Read from file
   auto tile = (Tile*)nullptr;
   auto tile_io = new TileIO(this, array_metadata_uri);
