@@ -45,12 +45,13 @@
 struct ArraySchemaFx {
   // Constant parameters
   const std::string URI_PREFIX = "hdfs://";
+  const std::string TEMP_DIR = "/tiledb/";
   const std::string GROUP = "test_group/";
   const std::string HADOOP = "/Users/jacobbolewski/Hadoop/hadoop/hadoop-dist/target/hadoop-2.8.1/bin/hadoop";
   const std::string ARRAY_NAME = "dense_test_100x100_10x10";
   tiledb_array_type_t ARRAY_TYPE = TILEDB_DENSE;
   const char* ARRAY_TYPE_STR = "dense";
-  const std::string ARRAY_PATH = URI_PREFIX + GROUP + ARRAY_NAME;
+  const std::string ARRAY_PATH = URI_PREFIX + TEMP_DIR +  GROUP + ARRAY_NAME;
   const std::string ARRAY_PATH_REAL = tiledb::URI(ARRAY_PATH).to_string();
   const uint64_t CAPACITY = 500;
   const char* CAPACITY_STR = "500";
@@ -101,14 +102,14 @@ struct ArraySchemaFx {
     // Create group, delete it if it already exists
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = HADOOP + " fs -test -d " + GROUP;
+    std::string cmd = HADOOP + " fs -test -d " + TEMP_DIR + GROUP;
     rc = system(cmd.c_str());
     if (rc == 0) {
-      cmd = HADOOP + " fs -rm -r -f " + GROUP;
+      cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
       rc = system(cmd.c_str());
       assert(rc == 0);
     }
-    rc = tiledb_group_create(ctx_, (URI_PREFIX + GROUP).c_str());
+    rc = tiledb_group_create(ctx_, (URI_PREFIX + TEMP_DIR + GROUP).c_str());
     assert(rc == TILEDB_OK);
   }
 

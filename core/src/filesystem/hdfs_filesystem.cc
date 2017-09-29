@@ -163,27 +163,34 @@ Status delete_file(hdfsFS fs, const URI& uri) {
 // allocated buffer buffer.
 Status read_from_file(
     hdfsFS fs, const URI& uri, off_t offset, void* buffer, uint64_t length) {
-  hdfsFile readFile = hdfsOpenFile(fs, uri.to_string().c_str(), O_RDONLY, length, 0, 0);
+  std::string uri_string = uri.to_string();
+  hdfsFile readFile = hdfsOpenFile(fs, uri_string.c_str(), O_RDONLY, length, 0, 0);
   if (!readFile) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot read file ") + uri.to_string() + ": file open error"));
+        std::string("Cannot read file ") + uri_string + ": file open error"));
   }
   int ret = hdfsSeek(fs, readFile, (tOffset)offset);
   if (ret < 0) {
     return LOG_STATUS(
-        Status::IOError(std::string("Cannot seek to offset ") + uri.to_string()));
+        Status::IOError(std::string("Cannot seek to offset ") + uri_string));
   }
-  tSize bytes_read = hdfsRead(fs, readFile, buffer, (tSize)length);
-  if (bytes_read != (tSize)length) {
-    return LOG_STATUS(
-        Status::IOError("Cannot read from file " + uri.to_string() + "; File reading error"));
-  }
-
+  uint64_t bytes_to_read = length;
+  char* buffptr = static_cast<char*>(buffer);
+  do {
+    tSize nbytes = (bytes_to_read <= INT_MAX) ? bytes_to_read : INT_MAX;
+    tSize bytes_read = hdfsRead(fs, readFile, static_cast<void*>(buffptr), nbytes);
+    if (bytes_read < 0) {
+        return LOG_STATUS(
+            Status::IOError("Cannot read from file " + uri_string + "; File reading error"));
+    }
+    bytes_to_read -= bytes_read;
+    buffptr += bytes_read;
+  } while (bytes_to_read > 0);
+  
   // Close file
   if (hdfsCloseFile(fs, readFile)) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot read from file ") + uri.to_string() +
-        "; File closing error"));
+        std::string("Cannot read from file ") + uri_string + "; File closing error"));
   }
   return Status::Ok();
 }
@@ -208,9 +215,9 @@ Status read_from_file(hdfsFS fs, const URI& uri, Buffer** buff) {
 // Write length bytes of buffer to a given path
 Status write_to_file(
     hdfsFS fs, const URI& uri, const void* buffer, const uint64_t length) {
-  // Open file
+  int flags = is_file(fs, uri) ?  O_WRONLY | O_APPEND : O_WRONLY;
   hdfsFile writeFile = hdfsOpenFile(
-      fs, uri.to_string().c_str(), O_WRONLY, constants::max_write_bytes, 0, 0);
+        fs, uri.to_string().c_str(), flags, constants::max_write_bytes, 0, 0);
   if (!writeFile) {
     return LOG_STATUS(Status::IOError(
         std::string("Cannot write to file ") + uri.to_string() +
@@ -222,11 +229,9 @@ Status write_to_file(
   off_t nrRemaining = 0;
   tSize curSize = 0;
   tSize written = 0;
-  for (nrRemaining = (off_t)length; nrRemaining > 0;
-       nrRemaining -= constants::max_write_bytes) {
+  for (nrRemaining = (off_t)length; nrRemaining > 0; nrRemaining -= constants::max_write_bytes) {
     curSize = (constants::max_write_bytes < nrRemaining) ? constants::max_write_bytes : static_cast<tSize>(nrRemaining);
-    if ((written = hdfsWrite(fs, writeFile, buffer, curSize)) !=
-        curSize) {
+    if ((written = hdfsWrite(fs, writeFile, buffer, curSize)) != curSize) {
       return LOG_STATUS(Status::IOError(
           std::string("Cannot write to file ") + uri.to_string() +
           "; File writing error"));

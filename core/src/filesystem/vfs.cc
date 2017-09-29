@@ -46,14 +46,12 @@ namespace tiledb {
 VFS::VFS() {
 #ifdef HAVE_HDFS
   Status st = hdfs::connect(hdfs_);
-  assert(st.ok());
 #endif
 }
 
 VFS::~VFS() {
 #ifdef HAVE_HDFS
  Status st = hdfs::disconnect(hdfs_);
- assert(st.ok());
 #endif
 } 
 
