@@ -93,9 +93,9 @@ struct SparseArrayFx {
     // Remove the temporary group
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = HADOOP + " -rm -r -f " + TEMP_DIR + GROUP;
-    int rc = system(cmd.c_str());
-    assert(rc == 0);
+    //std::string cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
+    //int rc = system(cmd.c_str());
+    //assert(rc == 0);
   }
 
   /**
@@ -206,7 +206,8 @@ struct SparseArrayFx {
       const tiledb_layout_t query_layout) {
     // Error code
     int rc;
-
+    
+    //assert(0);
     // Initialize a subarray
     const int64_t subarray[] = {
         domain_0_lo, domain_0_hi, domain_1_lo, domain_1_hi};

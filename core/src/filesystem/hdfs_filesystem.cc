@@ -62,17 +62,13 @@ Status disconnect(hdfsFS& fs) {
 }
 
 // create a directory with the given path
-Status create_dir(const std::string& path) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status create_dir(const std::string& path, hdfsFS fs) {
   if (is_dir(path, fs)) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot create directory hdfs://'") + path +
         "'; Directory already exists"));
   }
   int ret = hdfsCreateDirectory(fs, path.c_str());
-  disconnect(fs);
   if (ret < 0) {
     return LOG_STATUS(
         Status::IOError(std::string("Cannot create directory hdfs://'") + path));
@@ -81,11 +77,8 @@ Status create_dir(const std::string& path) {
 }
 
 // delete the directory with the given path
-Status delete_dir(const std::string& path) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status delete_dir(const std::string& path, hdfsFS fs) {
   int ret = hdfsDelete(fs, path.c_str(), 1);
-  disconnect(fs);
   if (ret < 0) {
     return LOG_STATUS(
         Status::IOError(std::string("Cannot delete directory '") + path));
@@ -93,11 +86,8 @@ Status delete_dir(const std::string& path) {
   return Status::Ok();
 }
 
-Status move_dir(const std::string& old_path, const std::string& new_path) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
-  int ret = hdfsMove(fs, old_path.c_str(), fs, new_path.c_str());
-  disconnect(fs);
+Status move_dir(const std::string& old_path, const std::string& new_path, hdfsFS fs) {
+  int ret = hdfsRename(fs, old_path.c_str(), new_path.c_str());
   if (ret < 0) {
     return LOG_STATUS(Status::IOError(
         std::string("Cannot move directory hdfs://") + old_path + " to hdfs://" + new_path));
@@ -105,74 +95,61 @@ Status move_dir(const std::string& old_path, const std::string& new_path) {
   return Status::Ok();
 }
 
-// Is the given path a valid directory
-bool is_dir(const std::string& path) {
-  hdfsFS fs;
-  connect(fs);
-  bool res = is_dir(path, fs);
-  disconnect(fs);
-  return res;
-}
-
 bool is_dir(const std::string& path, hdfsFS fs) {
-  hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
-  if (fileInfo == NULL) {
-    return false;
+  if (!hdfsExists(fs, path.c_str())) {
+    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
+    if (fileInfo == NULL) {
+      return false;
+    }
+    if ((char)(fileInfo->mKind) == 'D') {
+      hdfsFreeFileInfo(fileInfo, 1);
+      return true;
+    } else {
+      hdfsFreeFileInfo(fileInfo, 1);
+      return false;
+    }
   }
-  if ((char)(fileInfo->mKind) == 'D') {
-    hdfsFreeFileInfo(fileInfo, 1);
-    return true;
-  } else {
-    hdfsFreeFileInfo(fileInfo, 1);
-    return false;
-  }
+  return false;
 }
 
 // Is the given path a valid file
-bool is_file(const std::string& path) {
-  hdfsFS fs;
-  connect(fs);
-  hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
-  disconnect(fs);
-  if (fileInfo == NULL) {
-    return false;
+bool is_file(const std::string& path, hdfsFS fs) {
+   int ret = hdfsExists(fs, path.c_str());
+   if (!ret) {
+    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
+    if (fileInfo == NULL) {
+      return false;
+    }
+    if ((char)(fileInfo->mKind) == 'F') {
+      hdfsFreeFileInfo(fileInfo, 1);
+      return true;
+    } else {
+      hdfsFreeFileInfo(fileInfo, 1);
+      return false;
+    }
   }
-  if ((char)(fileInfo->mKind) == 'F') {
-    hdfsFreeFileInfo(fileInfo, 1);
-    return true;
-  } else {
-    hdfsFreeFileInfo(fileInfo, 1);
-    return false;
-  }
+  return false;
 }
 
 // create a file with the given path
-Status create_file(const std::string& path) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status create_file(const std::string& path, hdfsFS fs) {
   // Open file
   hdfsFile writeFile = hdfsOpenFile(fs, path.c_str(), O_WRONLY, 0, 0, 0);
   if (!writeFile) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot create file hdfs://'") + path + "'; File opening error"));
   }
   // Close file
   if (hdfsCloseFile(fs, writeFile)) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot create file hdfs://'") + path + "'; File closing error"));
   }
-  disconnect(fs);
   return Status::Ok();
 }
 
 // delete a file with the given path
-Status delete_file(const std::string& path) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status delete_file(const std::string& path, hdfsFS fs) {
   int ret = hdfsDelete(fs, path.c_str(), 0);
-  disconnect(fs);
   if (ret < 0) {
     return LOG_STATUS(
         Status::IOError(std::string("Cannot delete file hdfs://'") + path));
@@ -183,48 +160,41 @@ Status delete_file(const std::string& path) {
 // Read length bytes from file give by path from byte offset offset into pre
 // allocated buffer buffer.
 Status read_from_file(
-    const std::string& path, off_t offset, void* buffer, uint64_t length) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+    const std::string& path, off_t offset, void* buffer, uint64_t length, hdfsFS fs) {
   hdfsFile readFile = hdfsOpenFile(fs, path.c_str(), O_RDONLY, length, 0, 0);
   if (!readFile) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot read file hdfs://'") + path + "': file open error"));
   }
   int ret = hdfsSeek(fs, readFile, (tOffset)offset);
   if (ret < 0) {
-    disconnect(fs);
     return LOG_STATUS(
         Status::IOError(std::string("Cannot seek to offset hdfs://'") + path));
   }
   tSize bytes_read = hdfsRead(fs, readFile, buffer, (tSize)length);
   if (bytes_read != (tSize)length) {
-    disconnect(fs);
     return LOG_STATUS(
         Status::IOError("Cannot read from file; File reading error"));
   }
 
   // Close file
   if (hdfsCloseFile(fs, readFile)) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot read from file hdfs://'") + path +
         "'; File closing error"));
   }
-  disconnect(fs);
   return Status::Ok();
 }
 
-Status read_from_file(const std::string& path, Buffer** buff) {
+Status read_from_file(const std::string& path, Buffer** buff, hdfsFS fs) {
   // get the file size
   uint64_t nbytes = 0;
-  RETURN_NOT_OK(file_size(path, &nbytes));
+  RETURN_NOT_OK(file_size(path, &nbytes, fs));
   // create a new buffer
   *buff = new Buffer();
   (*buff)->realloc(nbytes);
   // Read contents
-  Status st = read_from_file(path, 0, (*buff)->data(), nbytes);
+  Status st = read_from_file(path, 0, (*buff)->data(), nbytes, fs);
   if (!st.ok()) {
     delete *buff;
     return LOG_STATUS(
@@ -235,14 +205,11 @@ Status read_from_file(const std::string& path, Buffer** buff) {
 
 // Write length bytes of buffer to a given path
 Status write_to_file(
-    const std::string& path, const void* buffer, const uint64_t length) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+    const std::string& path, const void* buffer, const uint64_t length, hdfsFS fs) {
   // Open file
   hdfsFile writeFile = hdfsOpenFile(
       fs, path.c_str(), O_WRONLY, constants::max_write_bytes, 0, 0);
   if (!writeFile) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot write to file hdfs://'") + path +
         "'; File opening error"));
@@ -260,7 +227,6 @@ Status write_to_file(
                   (tSize)nrRemaining;
     if ((written = hdfsWrite(fs, writeFile, (void*)buffer, curSize)) !=
         curSize) {
-      disconnect(fs);
       return LOG_STATUS(Status::IOError(
           std::string("Cannot write to file hdfs://'") + path +
           "'; File writing error"));
@@ -268,22 +234,17 @@ Status write_to_file(
   }
   // Close file
   if (hdfsCloseFile(fs, writeFile)) {
-    disconnect(fs);
     return LOG_STATUS(Status::IOError(
         std::string("Cannot write to file hdfs://'") + path +
         "'; File closing error"));
   }
-  disconnect(fs);
   return Status::Ok();
 }
 
 // List all subdirectories and files for a given path, appending them to paths.
-Status ls(const std::string& path, std::vector<std::string>* paths) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status ls(const std::string& path, std::vector<std::string>* paths, hdfsFS fs) {
   int numEntries = 0;
   hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
-  disconnect(fs);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
@@ -299,12 +260,9 @@ Status ls(const std::string& path, std::vector<std::string>* paths) {
 
 // List all subdirectories (1 level deep) for a given path, appending them to
 // dpaths.  Ordering does not matter.
-Status ls_dirs(const std::string& path, std::vector<std::string>& dpaths) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status ls_dirs(const std::string& path, std::vector<std::string>& dpaths, hdfsFS fs) {
   int numEntries = 0;
   hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
-  disconnect(fs);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
@@ -321,12 +279,9 @@ Status ls_dirs(const std::string& path, std::vector<std::string>& dpaths) {
 
 // List all subfiles (1 level deep) for a given path, appending them to fpaths.
 // Ordering does not matter.
-Status ls_files(const std::string& path, std::vector<std::string>& fpaths) {
-  hdfsFS fs;
-  RETURN_NOT_OK(connect(fs));
+Status ls_files(const std::string& path, std::vector<std::string>& fpaths, hdfsFS fs ) {
   int numEntries = 0;
   hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
-  disconnect(fs);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
@@ -342,29 +297,20 @@ Status ls_files(const std::string& path, std::vector<std::string>& fpaths) {
 }
 
 // File size in bytes for a given path
-Status file_size(const std::string& path, uint64_t* nbytes) {
-  hdfsFS fs;
-  std::cout << "Debug: file_size: connecting" << std::endl;
-  RETURN_NOT_OK(connect(fs))
-  std::cout << "Debug: filesize: connected to hdfs filesystem" << std::endl;
+Status file_size(const std::string& path, uint64_t* nbytes, hdfsFS fs) {
   hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
-  std::cout << "Debug: filesize: path " << path << std::endl;
   if (fileInfo == NULL) {
-    disconnect(fs);
     return LOG_STATUS(
         Status::IOError(std::string("Not a file hdfs://'") + path));
   }
   if ((char)(fileInfo->mKind) == 'F') {
     *nbytes = static_cast<uint64_t>(fileInfo->mSize);
-    std::cout << "Debug: filesize: nbytes" << *nbytes << std::endl;
   } else {
     hdfsFreeFileInfo(fileInfo, 1);
-    disconnect(fs);
     return LOG_STATUS(
         Status::IOError(std::string("Not a file hdfs://'") + path));
   }
   hdfsFreeFileInfo(fileInfo, 1);
-  disconnect(fs);
   return Status::Ok();
 }
 

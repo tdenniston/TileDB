@@ -57,55 +57,55 @@ Status disconnect(hdfsFS& fs);
 #endif
 
 // create a directory with the given path
-Status create_dir(const std::string& path);
+Status create_dir(const std::string& path, hdfsFS fs);
 
 // delete the directory with the given path
-Status delete_dir(const std::string& path);
+Status delete_dir(const std::string& path, hdfsFS fs);
 
 // Is the given path a valid directory
-bool is_dir(const std::string& path);
+bool is_dir(const std::string& path, hdfsFS fs);
 
 #ifdef HAVE_HDFS
 bool is_dir(const std::string& path, hdfsFS fs);
 #endif
 
 // move the directory to a new path
-Status move_dir(const std::string& old_dir, const std::string& new_dir);
+Status move_dir(const std::string& old_dir, const std::string& new_dir, hdfsFS fs);
 
 // Is the given path a valid file
-bool is_file(const std::string& path);
+bool is_file(const std::string& path, hdfsFS fs);
 
 // create a file with the given path
-Status create_file(const std::string& path);
+Status create_file(const std::string& path, hdfsFS fs);
 
 // delete a file with the given path
-Status delete_file(const std::string& path);
+Status delete_file(const std::string& path, hdfsFS fs);
 
 // Read length bytes from file give by path from byte offset offset into pre
 // allocated buffer buffer.
 Status read_from_file(
-    const std::string& path, off_t offset, void* buffer, uint64_t length);
+    const std::string& path, off_t offset, void* buffer, uint64_t length, hdfsFS fs);
 
-Status read_from_file(const std::string& path, Buffer** buff);
+Status read_from_file(const std::string& path, Buffer** buff, hdfsFS fs);
 
 // Write length bytes of buffer to a given path
 Status write_to_file(
-    const std::string& path, const void* buffer, const uint64_t length);
+    const std::string& path, const void* buffer, const uint64_t length, hdfsFS fs);
 
 // List all subdirectories and files for a given path, appending them to paths.
 // Ordering does not matter.
-Status ls(const std::string& path, std::vector<std::string>* paths);
+Status ls(const std::string& path, std::vector<std::string>* paths, hdfsFS fs);
 
 // List all subfiles (1 level deep) for a given path, appending them to fpaths.
 // Ordering does not matter.
-Status ls_files(const std::string& path, std::vector<std::string>& fpaths);
+Status ls_files(const std::string& path, std::vector<std::string>& fpaths, hdfsFS fs);
 
 // List all subdirectories (1 level deep) for a given path, appending them to
 // dpaths.  Ordering does not matter.
-Status ls_dirs(const std::string& path, std::vector<std::string>& fpaths);
+Status ls_dirs(const std::string& path, std::vector<std::string>& fpaths, hdfsFS fs);
 
 // File size in bytes for a given path
-Status file_size(const std::string& path, uint64_t* nbytes);
+Status file_size(const std::string& path, uint64_t* nbytes, hdfsFS fs);
 
 }  // namespace hdfs
 

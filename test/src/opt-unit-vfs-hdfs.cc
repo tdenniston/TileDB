@@ -14,7 +14,7 @@ TEST_CASE("Test VFS: HDFS URI", "[vfs]") {
   st = vfs->create_dir(tiledb_uri);
   CHECK(st.ok());
   CHECK(vfs->is_dir(tiledb_uri));
-  st = hdfs::delete_dir(tiledb_uri.to_path());
-  CHECK(st.ok());
+  //st = hdfs::delete_dir(tiledb_uri.to_path());
+  //CHECK(st.ok());
   delete vfs;
 }

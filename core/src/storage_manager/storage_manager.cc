@@ -423,7 +423,7 @@ Status StorageManager::array_open(
 
   // Lock the filelock of the array
   if (!open_array->filelocked()) {
-    int fd;
+    int fd = 0;
     RETURN_NOT_OK_ELSE(
         vfs_->filelock_lock(
             array_uri.join_path(constants::array_filelock_name), &fd, true),
@@ -550,23 +550,31 @@ Status StorageManager::open_array_load_fragment_metadata(
   // Get all the fragment uris, sorted by timestamp
   std::vector<URI> fragment_uris;
   const URI& array_uri = open_array->array_uri();
+  std::cout << "open_array_load_fragment_metadata array_uri " <<  array_uri.to_string() << "\n";
   RETURN_NOT_OK(get_fragment_uris(array_uri, subarray, &fragment_uris));
   sort_fragment_uris(&fragment_uris);
-
+  
+  std::cout << "open_array_load_fragment_metadata fragment_uris " << fragment_uris.empty() << "\n"; 
   if (fragment_uris.empty())
     return Status::Ok();
 
   // Load the metadata for each fragment
   for (auto& uri : fragment_uris) {
     // Find metadata entry in open array
+    std::cout << "open_array_load_fragment_metadata getting metatadata" << "\n";
     auto metadata = open_array->fragment_metadata_get(uri);
-
+    std::cout << "open_array_load_fragment_metadata is metadata null" << (metadata == nullptr) <<  "\n";
     // If not found, load metadata and store in open array
     if (metadata == nullptr) {
-      bool dense = !vfs_->is_file(uri.join_path(
-          std::string("/") + constants::coords + constants::file_suffix));
+      URI coords_uri = uri.join_path(
+          std::string("/") + constants::coords + constants::file_suffix);
+      std::cout << "open_array_load_fragment_metadata coords_uri " << coords_uri.to_string() << "\n";
+      bool dense = !vfs_->is_file(coords_uri);
+      std::cout << "open_array_load_fragment_metadata dense " << dense << "\n";
       metadata = new FragmentMetadata(open_array->array_metadata(), dense, uri);
+      std::cout << "open_array_load_fragment_metadata trying to load metadata \n";
       RETURN_NOT_OK_ELSE(load(metadata), delete metadata);
+      std::cout << "open_array_load_fragment_metadata metadata loaded \n";
       open_array->fragment_metadata_add(metadata);
     }
 
