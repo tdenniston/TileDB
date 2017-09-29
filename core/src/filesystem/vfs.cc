@@ -74,7 +74,7 @@ Status VFS::create_dir(const URI& uri) const {
   if (uri.is_posix())
     return posix::create_dir(uri.to_path());
   if (uri.is_hdfs())
-    return hdfs::create_dir(uri.to_path(), hdfs_);
+    return hdfs::create_dir(hdfs_, uri);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -83,7 +83,7 @@ Status VFS::create_file(const URI& uri) const {
   if (uri.is_posix())
     return posix::create_file(uri.to_path());
   if (uri.is_hdfs())
-    return hdfs::create_file(uri.to_path(), hdfs_);
+    return hdfs::create_file(hdfs_, uri);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -92,7 +92,7 @@ Status VFS::delete_file(const URI& uri) const {
   if (uri.is_posix())
     return posix::delete_file(uri.to_path());
   if (uri.is_hdfs())
-    return hdfs::delete_file(uri.to_path(), hdfs_);
+    return hdfs::delete_file(hdfs_, uri);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -121,7 +121,7 @@ Status VFS::file_size(const URI& uri, uint64_t* size) const {
   if (uri.is_posix())
     return posix::file_size(uri.to_path(), size);
   if (uri.is_hdfs())
-    return hdfs::file_size(uri.to_path(), size, hdfs_);
+    return hdfs::file_size(hdfs_, uri, size);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -130,7 +130,7 @@ bool VFS::is_dir(const URI& uri) const {
   if (uri.is_posix())
     return posix::is_dir(uri.to_path());
   if (uri.is_hdfs())
-    return hdfs::is_dir(uri.to_path(), hdfs_);
+    return hdfs::is_dir(hdfs_, uri);
   // TODO: Handle all other file systems here !
   return true;
 }
@@ -139,7 +139,7 @@ bool VFS::is_file(const URI& uri) const {
   if (uri.is_posix())
     return posix::is_file(uri.to_path());
   if (uri.is_hdfs())
-    return hdfs::is_file(uri.to_path(), hdfs_);
+    return hdfs::is_file(hdfs_, uri);
   // TODO: Handle all other file systems here !
   return true;
 }
@@ -149,7 +149,7 @@ Status VFS::ls(const URI& parent, std::vector<URI>* uris) const {
   if (parent.is_posix()) {
     RETURN_NOT_OK(posix::ls(parent.to_path(), &files));
   } else if (parent.is_hdfs()) {
-    RETURN_NOT_OK(hdfs::ls(parent.to_path(), &files, hdfs_));
+    RETURN_NOT_OK(hdfs::ls(hdfs_, parent, &files));
   }
   for (auto& file : files) {
     uris->push_back(URI(file));
@@ -163,7 +163,7 @@ Status VFS::move_dir(const URI& old_uri, const URI& new_uri) {
   if (old_uri.is_posix() && new_uri.is_posix())
     return posix::move_dir(old_uri.to_path(), new_uri.to_path());
   if (old_uri.is_hdfs() && new_uri.is_hdfs())
-    return hdfs::move_dir(old_uri.to_path(), new_uri.to_path(), hdfs_);
+    return hdfs::move_dir(hdfs_, old_uri, new_uri);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -184,7 +184,7 @@ Status VFS::read_from_file(
   if (uri.is_posix())
     return posix::read_from_file(uri.to_path(), offset, buffer, nbytes);
   if (uri.is_hdfs())
-    return hdfs::read_from_file(uri.to_path(), offset, buffer, nbytes, hdfs_);
+    return hdfs::read_from_file(hdfs_, uri, offset, buffer, nbytes);
   // TODO: Handle all other file systems here !
   return Status::Ok();
 }
@@ -205,7 +205,7 @@ Status VFS::write_to_file(
   if (uri.is_posix())
     return posix::write_to_file(uri.to_path(), buffer, buffer_size);
   if (uri.is_hdfs())
-    return hdfs::write_to_file(uri.to_path(), buffer, buffer_size, hdfs_);
+    return hdfs::write_to_file(hdfs_, uri, buffer, buffer_size);
 
   // TODO: Handle all other file systems here !
   return Status::Ok();

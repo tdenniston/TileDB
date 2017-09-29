@@ -62,42 +62,43 @@ Status disconnect(hdfsFS& fs) {
 }
 
 // create a directory with the given path
-Status create_dir(const std::string& path, hdfsFS fs) {
-  if (is_dir(path, fs)) {
+Status create_dir(hdfsFS fs, const URI& uri) {
+  if (is_dir(fs, uri)) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot create directory hdfs://'") + path +
+        std::string("Cannot create directory ") + uri.to_string() +
         "'; Directory already exists"));
   }
-  int ret = hdfsCreateDirectory(fs, path.c_str());
+  int ret = hdfsCreateDirectory(fs, uri.to_string().c_str());
   if (ret < 0) {
     return LOG_STATUS(
-        Status::IOError(std::string("Cannot create directory hdfs://'") + path));
+        Status::IOError(std::string("Cannot create directory ") + uri.to_string()));
   }
   return Status::Ok();
 }
 
 // delete the directory with the given path
-Status delete_dir(const std::string& path, hdfsFS fs) {
-  int ret = hdfsDelete(fs, path.c_str(), 1);
+Status delete_dir(hdfsFS fs, const URI& uri) {
+  int ret = hdfsDelete(fs, uri.to_string().c_str(), 1);
   if (ret < 0) {
     return LOG_STATUS(
-        Status::IOError(std::string("Cannot delete directory '") + path));
+        Status::IOError(std::string("Cannot delete directory '") + uri.to_string()));
   }
   return Status::Ok();
 }
 
-Status move_dir(const std::string& old_path, const std::string& new_path, hdfsFS fs) {
-  int ret = hdfsRename(fs, old_path.c_str(), new_path.c_str());
+Status move_dir(hdfsFS fs, const URI& old_uri, const URI& new_uri) {
+  int ret = hdfsRename(fs, old_uri.to_string().c_str(), new_uri.to_string().c_str());
   if (ret < 0) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot move directory hdfs://") + old_path + " to hdfs://" + new_path));
+        std::string("Cannot move directory ") + old_uri.to_string() + " to " + new_uri.to_string()));
   }
   return Status::Ok();
 }
 
-bool is_dir(const std::string& path, hdfsFS fs) {
-  if (!hdfsExists(fs, path.c_str())) {
-    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
+bool is_dir(hdfsFS fs, const URI& uri) {
+  std::string uri_string = uri.to_string();
+  if (!hdfsExists(fs, uri_string.c_str())) {
+    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, uri_string.c_str());
     if (fileInfo == NULL) {
       return false;
     }
@@ -113,10 +114,11 @@ bool is_dir(const std::string& path, hdfsFS fs) {
 }
 
 // Is the given path a valid file
-bool is_file(const std::string& path, hdfsFS fs) {
-   int ret = hdfsExists(fs, path.c_str());
+bool is_file(hdfsFS fs, const URI& uri) {
+   std::string uri_string = uri.to_string();
+   int ret = hdfsExists(fs, uri_string.c_str());
    if (!ret) {
-    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
+    hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, uri_string.c_str());
     if (fileInfo == NULL) {
       return false;
     }
@@ -132,27 +134,27 @@ bool is_file(const std::string& path, hdfsFS fs) {
 }
 
 // create a file with the given path
-Status create_file(const std::string& path, hdfsFS fs) {
+Status create_file(hdfsFS fs, const URI& uri) {
   // Open file
-  hdfsFile writeFile = hdfsOpenFile(fs, path.c_str(), O_WRONLY, 0, 0, 0);
+  hdfsFile writeFile = hdfsOpenFile(fs, uri.to_string().c_str(), O_WRONLY, 0, 0, 0);
   if (!writeFile) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot create file hdfs://'") + path + "'; File opening error"));
+        std::string("Cannot create file ") + uri.to_string() + "; File opening error"));
   }
   // Close file
   if (hdfsCloseFile(fs, writeFile)) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot create file hdfs://'") + path + "'; File closing error"));
+        std::string("Cannot create file ") + uri.to_string() + "; File closing error"));
   }
   return Status::Ok();
 }
 
 // delete a file with the given path
-Status delete_file(const std::string& path, hdfsFS fs) {
-  int ret = hdfsDelete(fs, path.c_str(), 0);
+Status delete_file(hdfsFS fs, const URI& uri) {
+  int ret = hdfsDelete(fs, uri.to_string().c_str(), 0);
   if (ret < 0) {
     return LOG_STATUS(
-        Status::IOError(std::string("Cannot delete file hdfs://'") + path));
+        Status::IOError(std::string("Cannot delete file ") + uri.to_string()));
   }
   return Status::Ok();
 }
@@ -160,59 +162,59 @@ Status delete_file(const std::string& path, hdfsFS fs) {
 // Read length bytes from file give by path from byte offset offset into pre
 // allocated buffer buffer.
 Status read_from_file(
-    const std::string& path, off_t offset, void* buffer, uint64_t length, hdfsFS fs) {
-  hdfsFile readFile = hdfsOpenFile(fs, path.c_str(), O_RDONLY, length, 0, 0);
+    hdfsFS fs, const URI& uri, off_t offset, void* buffer, uint64_t length) {
+  hdfsFile readFile = hdfsOpenFile(fs, uri.to_string().c_str(), O_RDONLY, length, 0, 0);
   if (!readFile) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot read file hdfs://'") + path + "': file open error"));
+        std::string("Cannot read file ") + uri.to_string() + ": file open error"));
   }
   int ret = hdfsSeek(fs, readFile, (tOffset)offset);
   if (ret < 0) {
     return LOG_STATUS(
-        Status::IOError(std::string("Cannot seek to offset hdfs://'") + path));
+        Status::IOError(std::string("Cannot seek to offset ") + uri.to_string()));
   }
   tSize bytes_read = hdfsRead(fs, readFile, buffer, (tSize)length);
   if (bytes_read != (tSize)length) {
     return LOG_STATUS(
-        Status::IOError("Cannot read from file; File reading error"));
+        Status::IOError("Cannot read from file " + uri.to_string() + "; File reading error"));
   }
 
   // Close file
   if (hdfsCloseFile(fs, readFile)) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot read from file hdfs://'") + path +
-        "'; File closing error"));
+        std::string("Cannot read from file ") + uri.to_string() +
+        "; File closing error"));
   }
   return Status::Ok();
 }
 
-Status read_from_file(const std::string& path, Buffer** buff, hdfsFS fs) {
+Status read_from_file(hdfsFS fs, const URI& uri, Buffer** buff) {
   // get the file size
   uint64_t nbytes = 0;
-  RETURN_NOT_OK(file_size(path, &nbytes, fs));
+  RETURN_NOT_OK(file_size(fs, uri, &nbytes));
   // create a new buffer
   *buff = new Buffer();
   (*buff)->realloc(nbytes);
   // Read contents
-  Status st = read_from_file(path, 0, (*buff)->data(), nbytes, fs);
+  Status st = read_from_file(fs, uri, 0, (*buff)->data(), nbytes);
   if (!st.ok()) {
     delete *buff;
     return LOG_STATUS(
-        Status::IOError("Cannot read from file; File reading error"));
+        Status::IOError("Cannot read from file " + uri.to_string() + "; File reading error"));
   }
   return st;
 }
 
 // Write length bytes of buffer to a given path
 Status write_to_file(
-    const std::string& path, const void* buffer, const uint64_t length, hdfsFS fs) {
+    hdfsFS fs, const URI& uri, const void* buffer, const uint64_t length) {
   // Open file
   hdfsFile writeFile = hdfsOpenFile(
-      fs, path.c_str(), O_WRONLY, constants::max_write_bytes, 0, 0);
+      fs, uri.to_string().c_str(), O_WRONLY, constants::max_write_bytes, 0, 0);
   if (!writeFile) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot write to file hdfs://'") + path +
-        "'; File opening error"));
+        std::string("Cannot write to file ") + uri.to_string() +
+        "; File opening error"));
   }
   // Append data to the file in batches of Configurator::max_write_bytes()
   // bytes at a time
@@ -222,33 +224,31 @@ Status write_to_file(
   tSize written = 0;
   for (nrRemaining = (off_t)length; nrRemaining > 0;
        nrRemaining -= constants::max_write_bytes) {
-    curSize = (constants::max_write_bytes < nrRemaining) ?
-                  constants::max_write_bytes :
-                  (tSize)nrRemaining;
-    if ((written = hdfsWrite(fs, writeFile, (void*)buffer, curSize)) !=
+    curSize = (constants::max_write_bytes < nrRemaining) ? constants::max_write_bytes : static_cast<tSize>(nrRemaining);
+    if ((written = hdfsWrite(fs, writeFile, buffer, curSize)) !=
         curSize) {
       return LOG_STATUS(Status::IOError(
-          std::string("Cannot write to file hdfs://'") + path +
-          "'; File writing error"));
+          std::string("Cannot write to file ") + uri.to_string() +
+          "; File writing error"));
     }
   }
   // Close file
   if (hdfsCloseFile(fs, writeFile)) {
     return LOG_STATUS(Status::IOError(
-        std::string("Cannot write to file hdfs://'") + path +
-        "'; File closing error"));
+        std::string("Cannot write to file ") + uri.to_string() +
+        "; File closing error"));
   }
   return Status::Ok();
 }
 
 // List all subdirectories and files for a given path, appending them to paths.
-Status ls(const std::string& path, std::vector<std::string>* paths, hdfsFS fs) {
+Status ls(hdfsFS fs, const URI& uri, std::vector<std::string>* paths) {
   int numEntries = 0;
-  hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
+  hdfsFileInfo* fileList = hdfsListDirectory(fs, uri.to_string().c_str(), &numEntries);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
-          Status::IOError(std::string("Cannot list files in hdfs://'") + path));
+          Status::IOError(std::string("Cannot list files in ") + uri.to_string()));
     }
   }
   for (int i = 0; i < numEntries; ++i) {
@@ -260,13 +260,13 @@ Status ls(const std::string& path, std::vector<std::string>* paths, hdfsFS fs) {
 
 // List all subdirectories (1 level deep) for a given path, appending them to
 // dpaths.  Ordering does not matter.
-Status ls_dirs(const std::string& path, std::vector<std::string>& dpaths, hdfsFS fs) {
+Status ls_dirs(hdfsFS fs, const URI& uri, std::vector<std::string>& dpaths) {
   int numEntries = 0;
-  hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
+  hdfsFileInfo* fileList = hdfsListDirectory(fs, uri.to_string().c_str(), &numEntries);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
-          Status::IOError(std::string("Cannot list files in hdfs://'") + path));
+          Status::IOError(std::string("Cannot list files in ") + uri.to_string()));
     }
   }
   for (int i = 0; i < numEntries; ++i) {
@@ -279,13 +279,13 @@ Status ls_dirs(const std::string& path, std::vector<std::string>& dpaths, hdfsFS
 
 // List all subfiles (1 level deep) for a given path, appending them to fpaths.
 // Ordering does not matter.
-Status ls_files(const std::string& path, std::vector<std::string>& fpaths, hdfsFS fs ) {
+Status ls_files(hdfsFS fs, const URI& uri, std::vector<std::string>& fpaths) {
   int numEntries = 0;
-  hdfsFileInfo* fileList = hdfsListDirectory(fs, path.c_str(), &numEntries);
+  hdfsFileInfo* fileList = hdfsListDirectory(fs, uri.to_string().c_str(), &numEntries);
   if (fileList == NULL) {
     if (errno) {
       return LOG_STATUS(
-          Status::IOError(std::string("Cannot list files in hdfs://'") + path));
+          Status::IOError(std::string("Cannot list files in ") + uri.to_string()));
     }
   }
   for (int i = 0; i < numEntries; ++i) {
@@ -297,18 +297,18 @@ Status ls_files(const std::string& path, std::vector<std::string>& fpaths, hdfsF
 }
 
 // File size in bytes for a given path
-Status file_size(const std::string& path, uint64_t* nbytes, hdfsFS fs) {
-  hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, path.c_str());
+Status file_size(hdfsFS fs, const URI& uri, uint64_t* nbytes) {
+  hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, uri.to_string().c_str());
   if (fileInfo == NULL) {
     return LOG_STATUS(
-        Status::IOError(std::string("Not a file hdfs://'") + path));
+        Status::IOError(std::string("Not a file ") + uri.to_string()));
   }
   if ((char)(fileInfo->mKind) == 'F') {
     *nbytes = static_cast<uint64_t>(fileInfo->mSize);
   } else {
     hdfsFreeFileInfo(fileInfo, 1);
     return LOG_STATUS(
-        Status::IOError(std::string("Not a file hdfs://'") + path));
+        Status::IOError(std::string("Not a file ") + uri.to_string()));
   }
   hdfsFreeFileInfo(fileInfo, 1);
   return Status::Ok();

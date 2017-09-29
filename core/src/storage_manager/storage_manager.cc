@@ -494,12 +494,15 @@ Status StorageManager::get_fragment_uris(
     const URI& array_uri,
     const void* subarray,
     std::vector<URI>* fragment_uris) const {
+
+  std::cout << "get_fragment_uris: Array URI " << array_uri.to_string() << "\n";
   // Get all uris in the array directory
   std::vector<URI> uris;
   RETURN_NOT_OK(vfs_->ls(array_uri, &uris));
-
+  
   // Get only the fragment uris
   for (auto& uri : uris) {
+    std::cout << "get_fragment_uris: URI " << uri.to_string() << "\n";
     // TODO: check here if the fragment overlaps subarray
     if (vfs_->is_file(uri.join_path(constants::fragment_filename)))
       fragment_uris->push_back(uri);
