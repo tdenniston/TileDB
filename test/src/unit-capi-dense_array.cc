@@ -614,9 +614,12 @@ TEST_CASE_METHOD(DenseArrayFx, "C API: Test random dense sorted reads", "[dense]
   tiledb_layout_t tile_order = TILEDB_ROW_MAJOR;
   int iter_num = 10;
 
+  std::cout << "DEBUG: Test random dense sorted reads\n";
+  std::cout << "DEBUG: set_array_name\n";
   // Set array name
   set_array_name("dense_test_5000x10000_100x100");
 
+  std::cout << "DEBUG: create_dense_array \n";
   // Create a dense integer array
   create_dense_array_2D(
       tile_extent_0,
@@ -629,12 +632,15 @@ TEST_CASE_METHOD(DenseArrayFx, "C API: Test random dense sorted reads", "[dense]
       cell_order,
       tile_order);
 
+  std::cout << "DEBUG: write_dense_array_by_tiles \n";
   // Write array cells with value = row id * COLUMNS + col id
   // to disk tile by tile
   rc = write_dense_array_by_tiles(
       domain_size_0, domain_size_1, tile_extent_0, tile_extent_1);
   REQUIRE(rc == TILEDB_OK);
 
+
+  std::cout << "DEBUG: write_dense_array_by_tiles written \n";
   // Test random subarrays and check with corresponding value set by
   // row_id*dim1+col_id. Top left corner is always 4,4.
   int64_t d0_lo = 4;
@@ -650,11 +656,13 @@ TEST_CASE_METHOD(DenseArrayFx, "C API: Test random dense sorted reads", "[dense]
     d1_hi = d1_lo + width;
     int64_t index = 0;
 
+    std::cout << "reading dense array [("  << d0_lo << ","  << d0_hi << "), (" << d1_lo << "," << d1_hi << ")]" << "\n";
     // Read subarray
     int* buffer = read_dense_array_2D(
         d0_lo, d0_hi, d1_lo, d1_hi, TILEDB_READ, TILEDB_ROW_MAJOR);
     REQUIRE(buffer != NULL);
 
+    std::cout << "checking dense array [("  << d0_lo << ","  << d0_hi << "), (" << d1_lo << "," << d1_hi << ")]" << "\n";
     bool allok = true;
     // Check
     for (int64_t i = d0_lo; i <= d0_hi; ++i) {
@@ -684,6 +692,7 @@ TEST_CASE_METHOD(DenseArrayFx, "C API: Test random dense sorted reads", "[dense]
 
 TEST_CASE_METHOD(
     DenseArrayFx, "C API: Test random dense sorted writes", "[capi]") {
+  std::cout << "DEBUG: Test random dense sorted writes\n";
   // Error code
   int rc;
 
@@ -701,9 +710,11 @@ TEST_CASE_METHOD(
   tiledb_layout_t tile_order = TILEDB_ROW_MAJOR;
   int iter_num = 10;
 
+  std::cout << "DEBUG: set_array_name\n";
   // Set array name
   set_array_name("dense_test_100x100_10x10");
 
+  std::cout << "DEBUG: create_dense_array_2D\n";
   // Create a dense integer array
   create_dense_array_2D(
       tile_extent_0,
@@ -737,11 +748,13 @@ TEST_CASE_METHOD(
       for (int64_t c = 0; c < subarray_length[1]; ++c)
         buffer[index++] = -(std::rand() % 999999);
 
+    std::cout << "DEBUG: writing dense subarray 2D [(" << d0[0] << "," << d0[1] << "), (" << d1[0] << "," << d1[1] << ")]\n";
     // Write 2D subarray
     rc = write_dense_subarray_2D(
         subarray, TILEDB_WRITE, TILEDB_ROW_MAJOR, buffer, buffer_sizes);
     REQUIRE(rc == TILEDB_OK);
 
+    std::cout << "DEBUG: reading dense subarray 2D [(" << d0[0] << "," << d0[1] << "), (" << d1[0] << "," << d1[1] << ")]\n";
     // Read back the same subarray
     int* read_buffer = read_dense_array_2D(
         subarray[0],
@@ -752,6 +765,7 @@ TEST_CASE_METHOD(
         TILEDB_ROW_MAJOR);
     REQUIRE(read_buffer != NULL);
 
+    std::cout << "DEBUG: checking dense subarray 2D [(" << d0[0] << "," << d0[1] << "), (" << d1[0] << "," << d1[1] << ")]\n";
     // Check the two buffers
     bool allok = true;
     for (index = 0; index < cell_num_in_subarray; ++index) {
