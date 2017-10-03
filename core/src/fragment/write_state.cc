@@ -467,12 +467,10 @@ Status WriteState::write_attr(
 
   // Fill tiles and dispatch them for writing
   uint64_t bytes_written = 0;
-  std::cout << "write_attr before do \n";
   int tilecnt = 0;
   do {
     tilecnt++;
     if (tilecnt % 100 == 0)
-      std::cout << "tilecnt " << tilecnt << "\n";
     RETURN_NOT_OK(tile->write(buf));
     if (tile->full()) {
       RETURN_NOT_OK(tile_io->write(tile, &bytes_written));
@@ -481,7 +479,6 @@ Status WriteState::write_attr(
       tile->set_size(0);
     }
   } while (!buf->end());
-  std::cout << "write_attr after do \n";
 
   // Clean up
   delete buf;
@@ -620,7 +617,6 @@ Status WriteState::write_sparse_unsorted(
   // Write each attribute individually
   int buffer_i = 0;
   for (int i = 0; i < attribute_id_num; ++i) {
-    std::cout << "Write State attr i " << attribute_ids[i] << "\n";
     if (!array_metadata->var_size(attribute_ids[i])) {  // FIXED CELLS
       RETURN_NOT_OK(write_sparse_unsorted_attr(
           attribute_ids[i],
@@ -667,7 +663,6 @@ Status WriteState::write_sparse_unsorted_attr(
   auto buffer_c = static_cast<const char*>(buffer);
   
   // Sort and write attribute values in batches
-  std::cout << "write_sparse_un_attr before for \n";
   Status st;
   for (uint64_t i = 0; i < buffer_cell_num; ++i) {
     // Write batch
@@ -684,14 +679,12 @@ Status WriteState::write_sparse_unsorted_attr(
         sorted_buf->write(buffer_c + cell_pos[i] * cell_size, cell_size));
   }
 
-  std::cout << "write_sparse_un_attr before after for \n";
   // Write final batch
   if (sorted_buf->offset() != 0) {
     RETURN_NOT_OK_ELSE(
         write_attr(attribute_id, sorted_buf->data(), sorted_buf->offset()),
         delete sorted_buf);
   }
-  std::cout << "write_sparse_un_attr before delete \n";
 
   // Clean up
   delete sorted_buf;

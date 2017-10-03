@@ -46,17 +46,13 @@ namespace tiledb {
 VFS::VFS() {
 #ifdef HAVE_HDFS
   Status st = hdfs::connect(hdfs_);
-  std::cout << "+++++++++++++++++++++++++++++++ CONNECT HDFS " << st.to_string() << " Ptr " << hdfs_ <<"  ++++++++++++++++++++++++++++++++++++\n";
 #endif
 }
 
 VFS::~VFS() {
 #ifdef HAVE_HDFS
  if (hdfs_ != nullptr) {
-   Status st = hdfs::disconnect(hdfs_);
-   std::cout << "+++++++++++++++++++++++++++++++ DISCONNECT HDFS " << st.to_string() << " ++++++++++++++++++++++++++++++++++++\n";
- } else {
-  std::cout << "+++++++++++++++++++++++++++++++ DISCONNECT HDFS NULLPTR ????  ++++++++++++++++++++++++++++++++++++\n";
+   //Status st = hdfs::disconnect(hdfs_);
  }
 #endif
 } 

@@ -47,10 +47,9 @@ URI::URI() {
 }
 
 URI::URI(const std::string& path) {
-  //std::cout << "DEBUG path: " << path << std::endl;
   if (URI::is_posix(path))
     uri_ = VFS::abs_path(path);
-  if (URI::is_hdfs(path))
+  if (URI::is_hdfs(path) || URI::is_s3(path))
     uri_ = path;
   else
     uri_ = "";

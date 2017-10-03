@@ -158,15 +158,12 @@ Status StorageManager::load(
     return LOG_STATUS(Status::StorageManagerError(
         "Cannot load array metadata; Invalid array URI"));
   
-  std::cout << "DEBUG: array_uri: " << array_uri.to_string() << std::endl; 
   URI array_metadata_uri =
       array_uri.join_path(constants::array_metadata_filename);
 
   uint64_t buffer_size = 0;
-  std::cout << "DEBUG: array_metadata_uri = " << array_metadata_uri.to_string() << std::endl;
   RETURN_NOT_OK(file_size(array_metadata_uri, &buffer_size));
   
-  std::cout << "DEBUG: Buffer size = " << buffer_size << std::endl;
   // Read from file
   auto tile = (Tile*)nullptr;
   auto tile_io = new TileIO(this, array_metadata_uri);
@@ -495,14 +492,12 @@ Status StorageManager::get_fragment_uris(
     const void* subarray,
     std::vector<URI>* fragment_uris) const {
 
-  std::cout << "get_fragment_uris: Array URI " << array_uri.to_string() << "\n";
   // Get all uris in the array directory
   std::vector<URI> uris;
   RETURN_NOT_OK(vfs_->ls(array_uri, &uris));
   
   // Get only the fragment uris
   for (auto& uri : uris) {
-    std::cout << "get_fragment_uris: URI " << uri.to_string() << "\n";
     // TODO: check here if the fragment overlaps subarray
     if (vfs_->is_file(uri.join_path(constants::fragment_filename)))
       fragment_uris->push_back(uri);
@@ -553,31 +548,23 @@ Status StorageManager::open_array_load_fragment_metadata(
   // Get all the fragment uris, sorted by timestamp
   std::vector<URI> fragment_uris;
   const URI& array_uri = open_array->array_uri();
-  std::cout << "open_array_load_fragment_metadata array_uri " <<  array_uri.to_string() << "\n";
   RETURN_NOT_OK(get_fragment_uris(array_uri, subarray, &fragment_uris));
   sort_fragment_uris(&fragment_uris);
   
-  std::cout << "open_array_load_fragment_metadata fragment_uris " << fragment_uris.empty() << "\n"; 
   if (fragment_uris.empty())
     return Status::Ok();
 
   // Load the metadata for each fragment
   for (auto& uri : fragment_uris) {
     // Find metadata entry in open array
-    std::cout << "open_array_load_fragment_metadata getting metatadata" << "\n";
     auto metadata = open_array->fragment_metadata_get(uri);
-    std::cout << "open_array_load_fragment_metadata is metadata null" << (metadata == nullptr) <<  "\n";
     // If not found, load metadata and store in open array
     if (metadata == nullptr) {
       URI coords_uri = uri.join_path(
           std::string("/") + constants::coords + constants::file_suffix);
-      std::cout << "open_array_load_fragment_metadata coords_uri " << coords_uri.to_string() << "\n";
       bool dense = !vfs_->is_file(coords_uri);
-      std::cout << "open_array_load_fragment_metadata dense " << dense << "\n";
       metadata = new FragmentMetadata(open_array->array_metadata(), dense, uri);
-      std::cout << "open_array_load_fragment_metadata trying to load metadata \n";
       RETURN_NOT_OK_ELSE(load(metadata), delete metadata);
-      std::cout << "open_array_load_fragment_metadata metadata loaded \n";
       open_array->fragment_metadata_add(metadata);
     }
 

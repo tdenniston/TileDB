@@ -136,6 +136,6 @@ TEST_CASE("Test HDFS filesystem", "[hdfs]") {
   st = hdfs::delete_dir(fs, URI("hdfs:///tiledb_test_dir"));
   CHECK(st.ok());
 
-  st = hdfs::disconnect(fs);
-  CHECK(st.ok());
+  //st = hdfs::disconnect(fs);
+  //CHECK(st.ok());
 }
