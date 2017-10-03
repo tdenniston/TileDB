@@ -47,7 +47,7 @@ struct ArraySchemaFx {
   const std::string URI_PREFIX = "hdfs://";
   const std::string TEMP_DIR = "/tiledb/";
   const std::string GROUP = "test_group/";
-  const std::string HADOOP = "/Users/jacobbolewski/Hadoop/hadoop/hadoop-dist/target/hadoop-2.8.1/bin/hadoop";
+  const std::string HADOOP = "hadoop";
   const std::string ARRAY_NAME = "dense_test_100x100_10x10";
   tiledb_array_type_t ARRAY_TYPE = TILEDB_DENSE;
   const char* ARRAY_TYPE_STR = "dense";
