@@ -261,8 +261,10 @@ Status write_to_file(
     hdfsFS fs, const URI& uri, const void* buffer, const uint64_t length) {
   BEGIN_FUNC(__func__);
   int flags = is_file(fs, uri) ?  O_WRONLY | O_APPEND : O_WRONLY;
+  std::cout << "opening file...";
   hdfsFile writeFile = hdfsOpenFile(
         fs, uri.to_string().c_str(), flags, constants::max_write_bytes, 0, 0);
+  std::cout << "opened\n";
   if (!writeFile) {
     return LOG_STATUS(Status::IOError(
         std::string("Cannot write to file ") + uri.to_string() +
@@ -276,11 +278,13 @@ Status write_to_file(
   tSize written = 0;
   for (nrRemaining = (off_t)length; nrRemaining > 0; nrRemaining -= constants::max_write_bytes) {
     curSize = (constants::max_write_bytes < nrRemaining) ? constants::max_write_bytes : static_cast<tSize>(nrRemaining);
+    std::cout << "writting to file...";
     if ((written = hdfsWrite(fs, writeFile, buffer, curSize)) != curSize) {
       return LOG_STATUS(Status::IOError(
           std::string("Cannot write to file ") + uri.to_string() +
           "; File writing error"));
     }
+    std::cout << "written\n";
   }
   // Close file
   if (hdfsCloseFile(fs, writeFile)) {
