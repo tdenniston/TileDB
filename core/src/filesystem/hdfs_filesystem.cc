@@ -45,8 +45,16 @@ namespace hdfs {
 #ifdef HAVE_HDFS
 
 Status connect(hdfsFS& fs) {
-  fs = hdfsConnect("default", 0);
-  if (!fs) {
+  struct hdfsBuilder* builder = hdfsNewBuilder();
+  if (builder == nullptr) {
+    return LOG_STATUS(Status::IOError("Failed to connect to hdfs, could not create connection builder"));
+  }
+  // TODO BUILDER OPTIONS
+  hdfsBuilderSetForceNewInstance(builder);
+  hdfsBuilderSetNameNode(builder, "default");
+  fs = hdfsBuilderConnect(builder);
+  if (fs == nullptr) {
+    // ERRNO FOR BETTER ERRORS
     return LOG_STATUS(
         Status::IOError(std::string("Failed to connect to hdfs")));
   }
@@ -63,12 +71,17 @@ Status disconnect(hdfsFS& fs) {
 
 // create a directory with the given path
 Status create_dir(hdfsFS fs, const URI& uri) {
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR " << uri.to_string() << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
+  bool isdir = is_dir(fs, uri);
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR " << isdir << " ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
   if (is_dir(fs, uri)) {
     return LOG_STATUS(Status::IOError(
         std::string("Cannot create directory ") + uri.to_string() +
         "'; Directory already exists"));
   }
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ CREATING DIR ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
   int ret = hdfsCreateDirectory(fs, uri.to_string().c_str());
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ DIR CREATED " << ret << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
   if (ret < 0) {
     return LOG_STATUS(
         Status::IOError(std::string("Cannot create directory ") + uri.to_string()));
@@ -97,16 +110,25 @@ Status move_dir(hdfsFS fs, const URI& old_uri, const URI& new_uri) {
 
 bool is_dir(hdfsFS fs, const URI& uri) {
   std::string uri_string = uri.to_string();
-  if (!hdfsExists(fs, uri_string.c_str())) {
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR HDFS EXISTS FS: " << fs << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
+  int exists = hdfsExists(fs, uri_string.c_str());
+  std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR HDFS EXISTS RESULT " << exists << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
+  if (exists == 0) { // success
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO " << uri.to_string() << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
     hdfsFileInfo* fileInfo = hdfsGetPathInfo(fs, uri_string.c_str());
-    if (fileInfo == NULL) {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO RESULT " << fileInfo << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
+    if (fileInfo == nullptr) {
       return false;
     }
     if ((char)(fileInfo->mKind) == 'D') {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO RESULT DIRECTORY " << fileInfo << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
       hdfsFreeFileInfo(fileInfo, 1);
+      std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO RESULT DIRECTORY FREED " << fileInfo << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
       return true;
     } else {
+      std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO RESULT FILE " << fileInfo << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
       hdfsFreeFileInfo(fileInfo, 1);
+      std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~ IS_DIR GET_PATH_INFO RESULT FREED " << fileInfo << "  ~~~~~~~~~~~~~~~~~~~~~~" << "\n";
       return false;
     }
   }

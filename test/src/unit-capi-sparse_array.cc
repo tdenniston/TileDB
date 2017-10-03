@@ -34,6 +34,7 @@
 #include "catch.hpp"
 #include "tiledb.h"
 
+#include <iostream>
 #include <sys/time.h>
 #include <cassert>
 #include <cstring>
@@ -56,8 +57,8 @@ struct SparseArrayFx {
   const std::string URI_PREFIX = "hdfs://";
   const std::string TEMP_DIR = "/tiledb/";
   const std::string GROUP = "my_group/";
-  
-  const std::string HADOOP = "/Users/jacobbolewski/Hadoop/hadoop/hadoop-dist/target/hadoop-2.8.1/bin/hadoop";
+  const std::string HADOOP = "hadoop";
+
   // Array name
   std::string array_name_;
 
@@ -71,7 +72,7 @@ struct SparseArrayFx {
     // Initialize context
     int rc = tiledb_ctx_create(&ctx_);
     assert(rc == TILEDB_OK);
-
+  
     // Create group, delete it if it already exists
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
@@ -93,9 +94,9 @@ struct SparseArrayFx {
     // Remove the temporary group
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    //std::string cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
-    //int rc = system(cmd.c_str());
-    //assert(rc == 0);
+    std::string cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
+    int rc = system(cmd.c_str());
+    assert(rc == 0);
   }
 
   /**
@@ -408,7 +409,7 @@ TEST_CASE_METHOD(
   int64_t domain_0_hi = domain_size_0 - 1;
   int64_t domain_1_lo = 0;
   int64_t domain_1_hi = domain_size_1 - 1;
-  int64_t capacity = 1000;
+  int64_t capacity = 100000;
   int ntests = 5;
 
   // set array_metadata name
@@ -443,7 +444,7 @@ TEST_CASE_METHOD(
         TILEDB_COL_MAJOR);
     CHECK(test_random_subarrays(domain_size_0, domain_size_1, ntests));
   }
-
+  
   SECTION("- no compression row/col-major") {
     create_sparse_array_2D(
         tile_extent_0,
@@ -518,7 +519,7 @@ TEST_CASE_METHOD(
         TILEDB_COL_MAJOR);
     CHECK(test_random_subarrays(domain_size_0, domain_size_1, ntests));
   }
-
+  
   SECTION("- bzip compression row/col-major") {
     create_sparse_array_2D(
         tile_extent_0,
@@ -550,7 +551,7 @@ TEST_CASE_METHOD(
         TILEDB_COL_MAJOR);
     CHECK(test_random_subarrays(domain_size_0, domain_size_1, ntests));
   }
-
+  
   SECTION("- rle compression row/col-major") {
     create_sparse_array_2D(
         tile_extent_0,
@@ -565,7 +566,7 @@ TEST_CASE_METHOD(
         TILEDB_COL_MAJOR);
     CHECK(test_random_subarrays(domain_size_0, domain_size_1, ntests));
   }
-
+  
   SECTION("- zstd compression row/col-major") {
     create_sparse_array_2D(
         tile_extent_0,
