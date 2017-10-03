@@ -124,7 +124,7 @@ struct ArraySchemaFx {
     // Remove the temporary group
     // TODO: The following should change for HDFS - GROUP does not have a URI
     // prefix
-    std::string cmd = HADOOP + " fs -rm -r -f " + GROUP;
+    std::string cmd = HADOOP + " fs -rm -r -f " + TEMP_DIR + GROUP;
     int rc = system(cmd.c_str());
     assert(rc == 0);
   }
