@@ -36,7 +36,6 @@
 #include "logger.h"
 
 #include <cassert>
-#include <cinttypes>
 #include <cmath>
 #include <iostream>
 #include <set>
