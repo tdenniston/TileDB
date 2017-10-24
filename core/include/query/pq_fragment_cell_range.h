@@ -37,7 +37,7 @@
 #include "array_metadata.h"
 #include "read_state.h"
 
-#include <cinttypes>
+#include <inttypes.h>
 
 namespace tiledb {
 

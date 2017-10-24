@@ -33,7 +33,7 @@
 #ifndef TILEDB_BUFFER_H
 #define TILEDB_BUFFER_H
 
-#include <cinttypes>
+#include <inttypes.h>
 
 #include "status.h"
 

@@ -38,7 +38,7 @@
 #include "const_buffer.h"
 #include "status.h"
 
-#include <cinttypes>
+#include <inttypes.h>
 
 namespace tiledb {
 

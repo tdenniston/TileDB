@@ -33,7 +33,7 @@
 #ifndef TILEDB_CONSTANTS_H
 #define TILEDB_CONSTANTS_H
 
-#include <cinttypes>
+#include <inttypes.h>
 
 namespace tiledb {
 

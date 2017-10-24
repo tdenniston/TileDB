@@ -34,7 +34,7 @@
 #ifndef TILEDB_ARRAY_READ_STATE_H
 #define TILEDB_ARRAY_READ_STATE_H
 
-#include <cinttypes>
+#include <inttypes.h>
 #include <cstring>
 #include <queue>
 #include <vector>
