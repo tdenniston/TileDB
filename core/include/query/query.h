@@ -42,6 +42,8 @@
 #include "status.h"
 #include "storage_manager.h"
 
+#include "md5/md5.h"
+
 #include <vector>
 
 namespace tiledb {

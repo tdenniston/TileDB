@@ -39,10 +39,7 @@ set_target_properties(catch_main PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 
-target_include_directories(
-  catch_main PRIVATE
-  ${CMAKE_SOURCE_DIR}/external/catch
-)
+target_include_directories(catch_main PRIVATE include/catch)
 
 # Gather the test source files
 file(GLOB_RECURSE TILEDB_TEST_SOURCES "src/unit-*.cc")
@@ -72,8 +69,7 @@ target_link_libraries(
 
 target_include_directories(
   tiledb_unit PRIVATE
-  ${TILEDB_CORE_INCLUDE_DIRS}
-  ${CMAKE_SOURCE_DIR}/external/catch
+  ${TILEDB_CORE_INCLUDE_DIRS} include/catch
 )
 
 if (APPLE)
