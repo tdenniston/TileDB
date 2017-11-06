@@ -34,6 +34,7 @@
 #include "hdfs_filesystem.h"
 #endif
 
+#include <climits>
 #include <fstream>
 #include <iostream>
 
