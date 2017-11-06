@@ -9,40 +9,40 @@
 
 // Disable bogus MSVC warnings.
 #ifndef _CRT_SECURE_NO_WARNINGS
-# define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #endif
 
 #include "posix.h"
 
 #include <limits.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #ifndef _WIN32
-# include <unistd.h>
+#include <unistd.h>
 #else
-# include <windows.h>
-# include <io.h>
+#include <io.h>
+#include <windows.h>
 
-# define O_CREAT _O_CREAT
-# define O_TRUNC _O_TRUNC
+#define O_CREAT _O_CREAT
+#define O_TRUNC _O_TRUNC
 
-# ifndef S_IRUSR
-#  define S_IRUSR _S_IREAD
-# endif
+#ifndef S_IRUSR
+#define S_IRUSR _S_IREAD
+#endif
 
-# ifndef S_IWUSR
-#  define S_IWUSR _S_IWRITE
-# endif
+#ifndef S_IWUSR
+#define S_IWUSR _S_IWRITE
+#endif
 
-# ifdef __MINGW32__
-#  define _SH_DENYNO 0x40
-# endif
+#ifdef __MINGW32__
+#define _SH_DENYNO 0x40
+#endif
 
 #endif  // _WIN32
 
 #ifdef fileno
-# undef fileno
+#undef fileno
 #endif
 
 namespace {
@@ -59,7 +59,9 @@ inline unsigned convert_rwcount(std::size_t count) {
 // Return type of read and write functions.
 typedef ssize_t RWResult;
 
-inline std::size_t convert_rwcount(std::size_t count) { return count; }
+inline std::size_t convert_rwcount(std::size_t count) {
+  return count;
+}
 #endif
 }
 
@@ -144,7 +146,8 @@ fmt::LongLong fmt::File::size() const {
   Stat file_stat = Stat();
   if (FMT_POSIX_CALL(fstat(fd_, &file_stat)) == -1)
     FMT_THROW(SystemError(errno, "cannot get file attributes"));
-  FMT_STATIC_ASSERT(sizeof(fmt::LongLong) >= sizeof(file_stat.st_size),
+  FMT_STATIC_ASSERT(
+      sizeof(fmt::LongLong) >= sizeof(file_stat.st_size),
       "return type of File::size is not large enough");
   return file_stat.st_size;
 #endif
@@ -179,8 +182,8 @@ void fmt::File::dup2(int fd) {
   int result = 0;
   FMT_RETRY(result, FMT_POSIX_CALL(dup2(fd_, fd)));
   if (result == -1) {
-    FMT_THROW(SystemError(errno,
-      "cannot duplicate file descriptor {} to {}", fd_, fd));
+    FMT_THROW(SystemError(
+        errno, "cannot duplicate file descriptor {} to {}", fd_, fd));
   }
 }
 
@@ -218,7 +221,8 @@ fmt::BufferedFile fmt::File::fdopen(const char *mode) {
   // Don't retry as fdopen doesn't return EINTR.
   FILE *f = FMT_POSIX_CALL(fdopen(fd_, mode));
   if (!f)
-    FMT_THROW(SystemError(errno, "cannot associate stream with file descriptor"));
+    FMT_THROW(
+        SystemError(errno, "cannot associate stream with file descriptor"));
   BufferedFile file(f);
   fd_ = -1;
   return file;

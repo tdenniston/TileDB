@@ -50,7 +50,7 @@ const char* array_metadata_filename = "__array_metadata.tdb";
 const char* fragment_metadata_filename = "__fragment_metadata.tdb";
 
 /** The default tile capacity. */
-const uint64_t capacity = 10000;
+const uint64_t capacity = 1000000;
 
 /** The size of a variable cell offset. */
 const uint64_t cell_var_offset_size = sizeof(uint64_t);
@@ -75,9 +75,6 @@ Compressor real_coords_compression = Compressor::BLOSC_ZSTD;
 
 /** The default compression level for the coordinates. */
 int coords_compression_level = -1;
-
-/** Special name reserved for the coordinates attribute. */
-const char* coords = "__coords";
 
 /** The array filelock name. */
 const char* array_filelock_name = "__array_lock.tdb";
@@ -252,6 +249,47 @@ const int version[3] = {1, 2, 0};
 
 /** The size of a tile chunk. */
 const uint64_t tile_chunk_size = INT_MAX;
+
+/* ********************************* */
+/*           RESERVED NAMES          */
+/* ********************************* */
+
+/** Special name reserved for the coordinates attribute. */
+const char* coords = "__coords";
+
+/**
+ * The name of the first key dimension (recall that a key in a
+ * key-value store is hashed into a 16-byte MD5 digest, which
+ * is represented as a 2-dimensional uint64_t value.
+ */
+const char* key_dim_1 = "__key_dim_1";
+
+/**
+ * The name of the second key dimension (recall that a key in a
+ * key-value store is hashed into a 16-byte MD5 digest, which
+ * is represented as a 2-dimensional uint64_t value.
+ */
+const char* key_dim_2 = "__key_dim_2";
+
+/** Reserved name for the key attribute in a key-value store. */
+const char* key_attr_name = "__key";
+
+/** Reserved name for the key type attribute in a key-value store. */
+const char* key_type_attr_name = "__key_type";
+
+/** Name of special empty file that indicates a key-value store. */
+const char* kv_filename = "__kv.tdb";
+
+/* ********************************* */
+/*             FUNCTIONS             */
+/* ********************************* */
+
+bool reserved_name(const std::string& name) {
+  return (
+      name == constants::key_attr_name ||
+      name == constants::key_type_attr_name || name == constants::coords ||
+      name == constants::key_dim_1 || name == constants::key_dim_2);
+}
 
 }  // namespace constants
 

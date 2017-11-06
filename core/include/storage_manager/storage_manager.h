@@ -147,12 +147,6 @@ class StorageManager {
   /** Deletes a fragment directory. */
   Status delete_fragment(const URI& uri) const;
 
-  /** Safely removes a TileDB resource. */
-  Status remove_path(const URI& uri) const;
-
-  /** Safely moves a TileDB resource. */
-  Status move(const URI& old_uri, const URI& new_uri, bool force = false) const;
-
   /**
    * Creates a TileDB group.
    *
@@ -171,14 +165,31 @@ class StorageManager {
    */
   Status init();
 
-  /** Returns true if the input URI is a fragment directory. */
-  bool is_fragment(const URI& uri) const;
+  /** Returns `true` if the input URI is an array directory. */
+  bool is_array(const URI& uri) const;
 
   /** Checks if the input URI is a directory. */
   bool is_dir(const URI& uri);
 
   /** Checks if the input URI is a file. */
   bool is_file(const URI& uri);
+
+  /** Returns `true` if the input URI is a fragment directory. */
+  bool is_fragment(const URI& uri) const;
+
+  /** Returns `true` if the input URI is a group directory. */
+  bool is_group(const URI& uri) const;
+
+  /** Returns `true` if the input URI is a key-value store directory. */
+  bool is_kv(const URI& uri) const;
+
+  /**
+   * Creates a TileDB key-value store, storing its metadata.
+   *
+   * @param kv_metadata The key-value metadata.
+   * @return Status
+   */
+  Status kv_create(ArrayMetadata* array_metadata);
 
   /**
    * Loads the metadata of an array from persistent storage into memory.
@@ -197,6 +208,9 @@ class StorageManager {
    * @return Status
    */
   Status load(FragmentMetadata* metadata);
+
+  /** Safely moves a TileDB resource. */
+  Status move(const URI& old_uri, const URI& new_uri, bool force = false) const;
 
   /**
    * TODO: DOC
@@ -333,6 +347,9 @@ class StorageManager {
    */
   Status read_from_file(
       const URI& uri, uint64_t offset, Buffer* buffer, uint64_t nbytes) const;
+
+  /** Safely removes a TileDB resource. */
+  Status remove_path(const URI& uri) const;
 
   /**
    * Stores an array metadata into persistent storage.

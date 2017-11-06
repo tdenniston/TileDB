@@ -1,5 +1,5 @@
 /**
- * @file   tiledb_walk.cc
+ * @file   tiledb_kv_create.cc
  *
  * @section LICENSE
  *
@@ -28,49 +28,54 @@
  *
  * @section DESCRIPTION
  *
- * It shows how to explore the contents of a TileDB directory.
+ * It shows how to create a key-value store.
  */
 
 #include <tiledb.h>
 #include <iostream>
-
-int print_path(const char* path, tiledb_object_t type, void* data);
 
 int main() {
   // Create TileDB context
   tiledb_ctx_t* ctx;
   tiledb_ctx_create(&ctx);
 
-  // Walk in a path with a pre- and post-order traversal
-  std::cout << "Preorder traversal:\n";
-  tiledb_walk(ctx, "my_group", TILEDB_PREORDER, print_path, nullptr);
-  std::cout << "\nPostorder traversal:\n";
-  tiledb_walk(ctx, "my_group", TILEDB_POSTORDER, print_path, nullptr);
+  // Create attributes
+  tiledb_attribute_t* a1;
+  tiledb_attribute_create(ctx, &a1, "a1", TILEDB_INT32);
+  tiledb_attribute_set_compressor(ctx, a1, TILEDB_BLOSC, -1);
+  tiledb_attribute_set_cell_val_num(ctx, a1, 1);
+  tiledb_attribute_t* a2;
+  tiledb_attribute_create(ctx, &a2, "a2", TILEDB_CHAR);
+  tiledb_attribute_set_compressor(ctx, a2, TILEDB_GZIP, -1);
+  tiledb_attribute_set_cell_val_num(ctx, a2, TILEDB_VAR_NUM);
+  tiledb_attribute_t* a3;
+  tiledb_attribute_create(ctx, &a3, "a3", TILEDB_FLOAT32);
+  tiledb_attribute_set_compressor(ctx, a3, TILEDB_ZSTD, -1);
+  tiledb_attribute_set_cell_val_num(ctx, a3, 2);
 
-  // Finalize context
+  // Create key-value metadata
+  const char* kv_name = "my_kv";
+  tiledb_kv_metadata_t* kv_metadata;
+  tiledb_kv_metadata_create(ctx, &kv_metadata, kv_name);
+  tiledb_kv_metadata_add_attribute(ctx, kv_metadata, a1);
+  tiledb_kv_metadata_add_attribute(ctx, kv_metadata, a2);
+  tiledb_kv_metadata_add_attribute(ctx, kv_metadata, a3);
+
+  // Check kv metadata
+  if (tiledb_kv_metadata_check(ctx, kv_metadata) != TILEDB_OK) {
+    std::cout << "Invalid key-value metadata\n";
+    return -1;
+  }
+
+  // Create key-value store
+  tiledb_kv_create(ctx, kv_metadata);
+
+  // Clean up
+  tiledb_attribute_free(ctx, a1);
+  tiledb_attribute_free(ctx, a2);
+  tiledb_attribute_free(ctx, a3);
+  tiledb_kv_metadata_free(ctx, kv_metadata);
   tiledb_ctx_free(ctx);
 
   return 0;
-}
-
-int print_path(const char* path, tiledb_object_t type, void* data) {
-  // Simply print the path and type
-  std::cout << path << " ";
-  switch (type) {
-    case TILEDB_ARRAY:
-      std::cout << "ARRAY";
-      break;
-    case TILEDB_KEY_VALUE:
-      std::cout << "KEY_VALUE";
-      break;
-    case TILEDB_GROUP:
-      std::cout << "GROUP";
-      break;
-    default:
-      std::cout << "INVALID";
-  }
-  std::cout << "\n";
-
-  // Always iterate till the end
-  return 1;
 }

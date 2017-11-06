@@ -74,7 +74,7 @@ class ArrayMetadata {
    *
    * @param uri The array uri.
    */
-  explicit ArrayMetadata(const URI& uri);
+  explicit ArrayMetadata(const URI& uri, bool is_kv = false);
 
   /** Destructor. */
   ~ArrayMetadata();
@@ -173,6 +173,13 @@ class ArrayMetadata {
   void dump(FILE* out) const;
 
   /**
+   * Applicable only to key-value stores. Dumps the array metadata information
+   * related to a key-value store in ASCII format in the selected output. For
+   * instance, this function will not print the array domain information.
+   */
+  void dump_as_kv(FILE* out) const;
+
+  /**
    * Gets the ids of the input attributes.
    *
    * @param attributes The name of the attributes whose ids will be retrieved.
@@ -204,7 +211,7 @@ class ArrayMetadata {
   bool var_size(unsigned int attribute_id) const;
 
   /** Adds an attribute, cloning the input. */
-  void add_attribute(const Attribute* attr);
+  Status add_attribute(const Attribute* attr);
 
   /**
    * It assigns values to the members of the object from the input buffer.
@@ -224,6 +231,9 @@ class ArrayMetadata {
    * @return Status
    */
   Status init();
+
+  /** Returns `true` if the array is a key-value store. */
+  bool is_kv() const;
 
   /** Sets the array type. */
   void set_array_type(ArrayType array_type);
@@ -289,6 +299,9 @@ class ArrayMetadata {
   /** The array domain. */
   Domain* domain_;
 
+  /** `True` if the array is a key-value store. */
+  bool is_kv_;
+
   /**
    * The tile order. It can be one of the following:
    *    - TILEDB_ROW_MAJOR
@@ -310,6 +323,11 @@ class ArrayMetadata {
   bool check_attribute_dimension_names() const;
 
   /**
+   * Returns false if some attribute has a special reserved name.
+   */
+  bool check_attribute_names_for_kv() const;
+
+  /**
    * Returns false if double delta compression is used with real attributes
    * or coordinates and true otherwise.
    */
@@ -320,6 +338,14 @@ class ArrayMetadata {
 
   /** Computes and returns the size of an attribute (or coordinates). */
   uint64_t compute_cell_size(unsigned int attribute_id) const;
+
+  /**
+   * Defines the array as a key-value store, properly setting the domain and
+   * adding some extra special attributes.
+   *
+   * @return Status
+   */
+  Status define_as_kv();
 };
 
 }  // namespace tiledb

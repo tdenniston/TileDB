@@ -29,8 +29,6 @@
  * @section DESCRIPTION
  *
  * This example explores the C API for the array metadata.
- *
- * Simply run the following to make it work.
  */
 
 #include <tiledb.h>

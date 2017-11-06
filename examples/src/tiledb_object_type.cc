@@ -64,6 +64,9 @@ void print_object_type(tiledb_object_t type) {
     case TILEDB_ARRAY:
       printf("ARRAY\n");
       break;
+    case TILEDB_KEY_VALUE:
+      printf("KEY_VALUE\n");
+      break;
     case TILEDB_GROUP:
       printf("GROUP\n");
       break;

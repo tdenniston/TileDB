@@ -34,6 +34,7 @@
 #define TILEDB_CONSTANTS_H
 
 #include <cinttypes>
+#include <string>
 
 namespace tiledb {
 
@@ -74,9 +75,6 @@ extern Compressor real_coords_compression;
 
 /** The default compression level for the coordinates. */
 extern int coords_compression_level;
-
-/** Special name reserved for the coordinates attribute. */
-extern const char* coords;
 
 /** The special value for an empty int32. */
 extern const int empty_int32;
@@ -251,6 +249,43 @@ extern const int version[3];
 
 /** The size of a tile chunk. */
 extern const uint64_t tile_chunk_size;
+
+/* ********************************* */
+/*           RESERVED NAMES          */
+/* ********************************* */
+
+/** Special name reserved for the coordinates attribute. */
+extern const char* coords;
+
+/**
+ * The name of the first key dimension (recall that a key in a
+ * key-value store is hashed into a 16-byte MD5 digest, which
+ * is represented as a 2-dimensional uint64_t value.
+ */
+extern const char* key_dim_1;
+
+/**
+ * The name of the second key dimension (recall that a key in a
+ * key-value store is hashed into a 16-byte MD5 digest, which
+ * is represented as a 2-dimensional uint64_t value.
+ */
+extern const char* key_dim_2;
+
+/** Reserved name for the key attribute in a key-value store. */
+extern const char* key_attr_name;
+
+/** Reserved name for the key type attribute in a key-value store. */
+extern const char* key_type_attr_name;
+
+/** Name of special empty file that indicates a key-value store. */
+extern const char* kv_filename;
+
+/* ********************************* */
+/*             FUNCTIONS             */
+/* ********************************* */
+
+/** Returns `true` if the input is a special name reserved by TileDB. */
+bool reserved_name(const std::string& name);
 
 }  // namespace constants
 

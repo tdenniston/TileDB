@@ -50,7 +50,12 @@ class Domain {
   /*     CONSTRUCTORS & DESTRUCTORS    */
   /* ********************************* */
 
-  /** Empty constructor. */
+  /**
+   * Constructor.
+   *
+   * @param is_kv If `true` then the domain corresponds to a key-value store
+   *     and, thus, has special dimensions.
+   */
   Domain();
 
   /**
@@ -84,6 +89,9 @@ class Domain {
    */
   Status add_dimension(
       const char* name, const void* domain, const void* tile_extent);
+
+  /** Adds two-special dimensions for a key-value domain. */
+  Status add_kv_dimensions();
 
   /** Returns the number of cells per tile (only for the dense case). */
   uint64_t cell_num_per_tile() const;

@@ -33,6 +33,7 @@
 
 #include "array_metadata.h"
 #include "const_buffer.h"
+#include "constants.h"
 #include "logger.h"
 
 #include <cassert>
@@ -61,6 +62,7 @@ ArrayMetadata::ArrayMetadata() {
   domain_ = nullptr;
   tile_order_ = Layout::ROW_MAJOR;
   std::memcpy(version_, constants::version, sizeof(version_));
+  is_kv_ = false;
 }
 
 ArrayMetadata::ArrayMetadata(const ArrayMetadata* array_metadata) {
@@ -80,9 +82,10 @@ ArrayMetadata::ArrayMetadata(const ArrayMetadata* array_metadata) {
   domain_ = array_metadata->domain_;
   tile_order_ = array_metadata->tile_order_;
   std::memcpy(version_, array_metadata->version_, sizeof(version_));
+  is_kv_ = array_metadata->is_kv_;
 }
 
-ArrayMetadata::ArrayMetadata(const URI& uri) {
+ArrayMetadata::ArrayMetadata(const URI& uri, bool is_kv) {
   attribute_num_ = 0;
   array_uri_ = uri;
   array_type_ = ArrayType::DENSE;
@@ -96,6 +99,14 @@ ArrayMetadata::ArrayMetadata(const URI& uri) {
   domain_ = nullptr;
   tile_order_ = Layout::ROW_MAJOR;
   std::memcpy(version_, constants::version, sizeof(version_));
+  is_kv_ = is_kv;
+
+  // Potentially define the array as a key-value store
+  if (is_kv_) {
+    Status st = define_as_kv();
+    if (!st.ok())
+      LOG_STATUS(st);
+  }
 }
 
 ArrayMetadata::~ArrayMetadata() {
@@ -208,9 +219,10 @@ Status ArrayMetadata::check() const {
     return LOG_STATUS(Status::ArrayMetadataError(
         "Array metadata check failed; No dimensions provided"));
 
-  if (array_type_ == ArrayType ::DENSE && attribute_num_ == 0)
-    return LOG_STATUS(Status::ArrayMetadataError(
-        "Array metadata check failed; No attributes provided"));
+  if (array_type_ == ArrayType::DENSE && attribute_num_ == 0)
+    return LOG_STATUS(
+        Status::ArrayMetadataError("Array metadata check failed; No attributes "
+                                   "provided to a dense array"));
 
   if (!check_double_delta_compressor())
     return LOG_STATUS(Status::ArrayMetadataError(
@@ -279,6 +291,7 @@ void ArrayMetadata::dump(FILE* out) const {
 
   fprintf(out, "- Array name: %s\n", array_uri_.to_string().c_str());
   fprintf(out, "- Array type: %s\n", array_type_s);
+  fprintf(out, "- Key-value: %s\n", (is_kv_) ? "true" : "false");
   fprintf(out, "- Cell order: %s\n", cell_order_s);
   fprintf(out, "- Tile order: %s\n", tile_order_s);
   fprintf(out, "- Capacity: %" PRIu64 "\n", capacity_);
@@ -295,6 +308,18 @@ void ArrayMetadata::dump(FILE* out) const {
     domain_->dump(out);
 
   for (auto& attr : attributes_) {
+    fprintf(out, "\n");
+    attr->dump(out);
+  }
+}
+
+void ArrayMetadata::dump_as_kv(FILE* out) const {
+  fprintf(out, "- Key-value store name: %s\n", array_uri_.to_string().c_str());
+
+  for (auto& attr : attributes_) {
+    if (attr->name() == constants::key_attr_name ||
+        attr->name() == constants::key_type_attr_name)
+      continue;
     fprintf(out, "\n");
     attr->dump(out);
   }
@@ -319,6 +344,7 @@ Status ArrayMetadata::get_attribute_ids(
 // ===== FORMAT =====
 // version (int[3])
 // array_type (char)
+// is_kv (bool)
 // tile_order (char)
 // cell_order (char)
 // capacity (uint64_t)
@@ -338,6 +364,9 @@ Status ArrayMetadata::serialize(Buffer* buff) const {
   // Write array type
   auto array_type = (char)array_type_;
   RETURN_NOT_OK(buff->write(&array_type, sizeof(char)));
+
+  // Write is_kv
+  RETURN_NOT_OK(buff->write(&is_kv_, sizeof(bool)));
 
   // Write tile and cell order
   auto tile_order = (char)tile_order_;
@@ -403,14 +432,27 @@ bool ArrayMetadata::var_size(unsigned int attribute_id) const {
   return false;
 }
 
-void ArrayMetadata::add_attribute(const Attribute* attr) {
-  attributes_.emplace_back(new Attribute(attr));
+Status ArrayMetadata::add_attribute(const Attribute* attr) {
+  // Check if a reseved name is used
+  if (constants::reserved_name(attr->name()))
+    return LOG_STATUS(
+        Status::ArrayMetadataError("Cannot add attribute with reserved name"));
+
+  if (!is_kv_) {
+    attributes_.emplace_back(new Attribute(attr));
+  } else {
+    attributes_.insert(
+        attributes_.begin() + attribute_num_ - 2, new Attribute(attr));
+  }
   ++attribute_num_;
+
+  return Status::Ok();
 }
 
 // ===== FORMAT =====
 // version (int[3])
 // array_type (char)
+// is_kv (bool)
 // tile_order (char)
 // cell_order (char)
 // capacity (uint64_t)
@@ -431,6 +473,9 @@ Status ArrayMetadata::deserialize(ConstBuffer* buff) {
   char array_type;
   RETURN_NOT_OK(buff->read(&array_type, sizeof(char)));
   array_type_ = (ArrayType)array_type;
+
+  // Load is_kv
+  RETURN_NOT_OK(buff->read(&is_kv_, sizeof(bool)));
 
   // Load tile order
   char tile_order;
@@ -481,7 +526,6 @@ const Domain* ArrayMetadata::domain() const {
 }
 
 Status ArrayMetadata::init() {
-  // Perform check of all members
   RETURN_NOT_OK(check());
 
   // Set cell sizes
@@ -496,6 +540,10 @@ Status ArrayMetadata::init() {
 
   // Success
   return Status::Ok();
+}
+
+bool ArrayMetadata::is_kv() const {
+  return is_kv_;
 }
 
 void ArrayMetadata::set_array_type(ArrayType array_type) {
@@ -514,6 +562,7 @@ void ArrayMetadata::set_domain(Domain* domain) {
   // Set domain
   delete domain_;
   domain_ = new Domain(domain);
+  is_kv_ = false;
 
   // Potentially change the default coordinates compressor
   if (domain_->type() == Datatype::FLOAT32 ||
@@ -541,12 +590,25 @@ bool ArrayMetadata::check_attribute_dimension_names() const {
   return (names.size() == attribute_num_ + dim_num);
 }
 
+bool ArrayMetadata::check_attribute_names_for_kv() const {
+  for (auto attr : attributes_) {
+    auto& name = attr->name();
+    if (name == constants::key_type_attr_name ||
+        name == constants::key_attr_name)
+      return false;
+  }
+
+  return true;
+}
+
 bool ArrayMetadata::check_double_delta_compressor() const {
   // Check coordinates
-  if ((domain_->type() == Datatype::FLOAT32 ||
-       domain_->type() == Datatype::FLOAT64) &&
-      coords_compression_ == Compressor::DOUBLE_DELTA)
-    return false;
+  if (!is_kv_) {
+    if ((domain_->type() == Datatype::FLOAT32 ||
+         domain_->type() == Datatype::FLOAT64) &&
+        coords_compression_ == Compressor::DOUBLE_DELTA)
+      return false;
+  }
 
   // Check attributes
   for (auto attr : attributes_) {
@@ -639,6 +701,32 @@ uint64_t ArrayMetadata::compute_cell_size(unsigned int i) const {
   }
 
   return size;
+}
+
+Status ArrayMetadata::define_as_kv() {
+  // Set array type
+  array_type_ = ArrayType::SPARSE;
+
+  // Set domain
+  delete domain_;
+  domain_ = new Domain(Datatype::UINT64);
+  RETURN_NOT_OK(domain_->add_kv_dimensions());
+
+  // Add key attribute
+  auto key_attr = new Attribute(constants::key_attr_name, Datatype::CHAR);
+  key_attr->set_cell_val_num(constants::var_num);
+  key_attr->set_compressor(Compressor::BLOSC_ZSTD);
+  attributes_.emplace_back(key_attr);
+  ++attribute_num_;
+
+  // Add key type attribute
+  auto key_type_attr =
+      new Attribute(constants::key_type_attr_name, Datatype::CHAR);
+  key_type_attr->set_compressor(Compressor::DOUBLE_DELTA);
+  attributes_.emplace_back(key_type_attr);
+  ++attribute_num_;
+
+  return Status::Ok();
 }
 
 }  // namespace tiledb

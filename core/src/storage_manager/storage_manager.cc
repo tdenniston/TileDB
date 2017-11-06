@@ -74,7 +74,7 @@ Status StorageManager::array_consolidate(const char* array_name) {
   }
 
   // Check if array exists
-  if (object_type(array_uri) != ObjectType::ARRAY) {
+  if (!is_array(array_uri)) {
     return LOG_STATUS(Status::StorageManagerError(
         "Cannot consolidate array; Array does not exist"));
   }
@@ -199,24 +199,6 @@ Status StorageManager::delete_fragment(const URI& uri) const {
   return vfs_->remove_path(uri);
 }
 
-Status StorageManager::remove_path(const URI& uri) const {
-  if (object_type(uri) == ObjectType::INVALID) {
-    return LOG_STATUS(Status::StorageManagerError(
-        "Not a valid TileDB object: " + uri.to_string()));
-  }
-  return vfs_->remove_path(uri);
-}
-
-Status StorageManager::move(
-    const URI& old_uri, const URI& new_uri, bool force) const {
-  if (object_type(old_uri) == ObjectType::INVALID) {
-    return LOG_STATUS(Status::StorageManagerError(
-        "Not a valid TileDB object: " + old_uri.to_string()));
-  }
-
-  return vfs_->move_path(old_uri, new_uri);
-}
-
 Status StorageManager::group_create(const std::string& group) const {
   // Create group URI
   URI uri(group);
@@ -229,9 +211,11 @@ Status StorageManager::group_create(const std::string& group) const {
 
   // Create group file
   URI group_filename = uri.join_path(constants::group_filename);
-  RETURN_NOT_OK(vfs_->create_file(group_filename));
+  Status st = vfs_->create_file(group_filename);
+  if (!st.ok())
+    vfs_->remove_path(uri);
 
-  return Status::Ok();
+  return st;
 }
 
 Status StorageManager::init() {
@@ -240,6 +224,10 @@ Status StorageManager::init() {
   vfs_ = new VFS();
 
   return Status::Ok();
+}
+
+bool StorageManager::is_array(const URI& uri) const {
+  return vfs_->is_file(uri.join_path(constants::array_metadata_filename));
 }
 
 bool StorageManager::is_dir(const URI& uri) {
@@ -252,6 +240,38 @@ bool StorageManager::is_file(const URI& uri) {
 
 bool StorageManager::is_fragment(const URI& uri) const {
   return vfs_->is_file(uri.join_path(constants::fragment_metadata_filename));
+}
+
+bool StorageManager::is_group(const URI& uri) const {
+  return vfs_->is_file(uri.join_path(constants::group_filename));
+}
+
+bool StorageManager::is_kv(const URI& uri) const {
+  return vfs_->is_file(uri.join_path(constants::kv_filename));
+}
+
+Status StorageManager::kv_create(ArrayMetadata* array_metadata) {
+  // Check array metadata
+  if (array_metadata == nullptr) {
+    return LOG_STATUS(Status::StorageManagerError(
+        "Cannot create key-value store; Empty key-value metadata"));
+  }
+  RETURN_NOT_OK(array_metadata->check());
+
+  // Create array directory
+  const URI& array_uri = array_metadata->array_uri();
+  RETURN_NOT_OK(vfs_->create_dir(array_uri));
+
+  // Store array metadata
+  RETURN_NOT_OK_ELSE(store(array_metadata), vfs_->remove_path(array_uri));
+
+  // Create array filelock
+  URI filelock_uri = array_uri.join_path(constants::array_filelock_name);
+  RETURN_NOT_OK_ELSE(
+      vfs_->create_file(filelock_uri), vfs_->remove_path(array_uri));
+
+  // Success
+  return Status::Ok();
 }
 
 Status StorageManager::load(
@@ -308,15 +328,27 @@ Status StorageManager::load(FragmentMetadata* fragment_metadata) {
   return st;
 }
 
+Status StorageManager::move(
+    const URI& old_uri, const URI& new_uri, bool force) const {
+  if (object_type(old_uri) == ObjectType::INVALID) {
+    return LOG_STATUS(Status::StorageManagerError(
+        "Not a valid TileDB object: " + old_uri.to_string()));
+  }
+
+  return vfs_->move_path(old_uri, new_uri);
+}
+
 Status StorageManager::move_path(
     const URI& old_uri, const URI& new_uri, bool force) {
   return vfs_->move_path(old_uri, new_uri);
 }
 
 ObjectType StorageManager::object_type(const URI& uri) const {
-  if (vfs_->is_file(uri.join_path(constants::group_filename)))
+  if (is_group(uri))
     return ObjectType::GROUP;
-  if (vfs_->is_file(uri.join_path(constants::array_metadata_filename)))
+  if (is_kv(uri))
+    return ObjectType::KEY_VALUE;
+  if (is_array(uri))
     return ObjectType::ARRAY;
   return ObjectType::INVALID;
 }
@@ -501,17 +533,26 @@ Status StorageManager::read_from_file(
   return Status::Ok();
 }
 
+Status StorageManager::remove_path(const URI& uri) const {
+  if (object_type(uri) == ObjectType::INVALID) {
+    return LOG_STATUS(Status::StorageManagerError(
+        "Not a valid TileDB object: " + uri.to_string()));
+  }
+  return vfs_->remove_path(uri);
+}
+
 Status StorageManager::store(ArrayMetadata* array_metadata) {
+  const URI& array_uri = array_metadata->array_uri();
   URI array_metadata_uri =
-      array_metadata->array_uri().join_path(constants::array_metadata_filename);
+      array_uri.join_path(constants::array_metadata_filename);
+
+  // Delete array metadata file if it exists already
+  if (is_file(array_metadata_uri))
+    RETURN_NOT_OK(remove_path(array_metadata_uri));
 
   // Serialize
   auto buff = new Buffer();
   RETURN_NOT_OK_ELSE(array_metadata->serialize(buff), delete buff);
-
-  // Delete file if it exists already
-  if (is_file(array_metadata_uri))
-    RETURN_NOT_OK_ELSE(remove_path(array_metadata_uri), delete buff);
 
   // Write to file
   buff->reset_offset();
@@ -529,6 +570,16 @@ Status StorageManager::store(ArrayMetadata* array_metadata) {
   delete tile;
   delete tile_io;
   delete buff;
+
+  // If it is a key-value store, create a new key-value special file
+  if (st.ok() && array_metadata->is_kv()) {
+    URI kv_uri = array_uri.join_path(constants::kv_filename);
+    st = vfs_->create_file(kv_uri);
+    if (!st.ok()) {
+      vfs_->remove_path(array_metadata_uri);
+      vfs_->remove_path(kv_uri);
+    }
+  }
 
   return st;
 }
@@ -633,7 +684,7 @@ Status StorageManager::array_open(
     const ArrayMetadata** array_metadata,
     std::vector<FragmentMetadata*>* fragment_metadata) {
   // Check if array exists
-  if (object_type(array_uri) != ObjectType::ARRAY) {
+  if (!is_array(array_uri)) {
     return LOG_STATUS(
         Status::StorageManagerError("Cannot open array; Array does not exist"));
   }

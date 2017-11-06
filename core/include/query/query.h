@@ -42,8 +42,6 @@
 #include "status.h"
 #include "storage_manager.h"
 
-#include "md5/md5.h"
-
 #include <vector>
 
 namespace tiledb {
@@ -397,6 +395,18 @@ class Query {
 
   /** Sets the query subarray. */
   Status set_subarray(const void* subarray);
+
+  /**
+   * Applicable only to key-value stores.
+   *
+   * TileDB hashes th binary representation of `subarry` into a 16-byte MD5
+   * digest, and stores this as a 2-dimensional uint64_t subarray.
+   *
+   * @param subarray Has format:
+   *      key_type (char) | key_size (uint64_t) | key (key_size bytes)
+   * @return Status
+   */
+  Status set_subarray_as_hash(const void* subarray);
 
   /**
    * Sets the input buffer sizes to zero. The function assumes that the buffer

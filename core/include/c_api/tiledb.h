@@ -174,6 +174,9 @@ typedef struct tiledb_attribute_iter_t tiledb_attribute_iter_t;
 /** A TileDB array metadata. */
 typedef struct tiledb_array_metadata_t tiledb_array_metadata_t;
 
+/** A TileDB key-value store metadata. */
+typedef struct tiledb_kv_metadata_t tiledb_kv_metadata_t;
+
 /** A TileDB dimension. */
 typedef struct tiledb_dimension_t tiledb_dimension_t;
 
@@ -185,6 +188,9 @@ typedef struct tiledb_domain_t tiledb_domain_t;
 
 /** A TileDB query. */
 typedef struct tiledb_query_t tiledb_query_t;
+
+/** A TileDB key used in key-value stores. */
+typedef struct tiledb_key_t tiledb_key_t;
 
 /* ********************************* */
 /*              CONTEXT              */
@@ -597,7 +603,8 @@ TILEDB_EXPORT int tiledb_array_metadata_add_attribute(
     tiledb_attribute_t* attr);
 
 /**
- * Sets a domain to array metadata.
+ * Sets a domain to array metadata. If the array metadata already has a
+ * domain, it will be overwritten.
  *
  * @param ctx The TileDB context.
  * @param array_metadata The array metadata.
@@ -793,6 +800,104 @@ TILEDB_EXPORT int tiledb_array_metadata_dump(
     FILE* out);
 
 /* ********************************* */
+/*         KEY-VALUE METADATA        */
+/* ********************************* */
+
+/**
+ * Creates a TileDB key-value store metadata object.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The TileDB key-value metadata to be created.
+ * @param kv_name The key-value store name.
+ * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_create(
+    tiledb_ctx_t* ctx, tiledb_kv_metadata_t** kv_metadata, const char* kv_name);
+
+/**
+ * Destroys key-value metadata, freeing-up memory.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata to be destroyed.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_free(
+    tiledb_ctx_t* ctx, tiledb_kv_metadata_t* kv_metadata);
+
+/**
+ * Adds an attribute to a key-value metadata.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @param attr The attribute to be added.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_add_attribute(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_metadata_t* kv_metadata,
+    tiledb_attribute_t* attr);
+
+/**
+ * Checks the correctness of the key-value metadata.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @return TILEDB_OK if the array metadata is correct and TILEDB_ERR upon any
+ *     error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_check(
+    tiledb_ctx_t* ctx, tiledb_kv_metadata_t* kv_metadata);
+
+/**
+ * Retrieves the key-value store name.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @param kv_name The key-value store name to be retrieved.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_get_name(
+    tiledb_ctx_t* ctx,
+    const tiledb_kv_metadata_t* kv_metadata,
+    const char** kv_name);
+
+/**
+ * Dumps the key-value metadata in ASCII format in the selected output.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @param out The output.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_dump(
+    tiledb_ctx_t* ctx, const tiledb_kv_metadata_t* kv_metadata, FILE* out);
+
+/**
+ * Dumps the underlying sparse array metadata of the key-value metadata in
+ * ASCII format in the selected output.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @param out The output.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_dump_as_array(
+    tiledb_ctx_t* ctx, const tiledb_kv_metadata_t* kv_metadata, FILE* out);
+
+/**
+ * Retrieves the metadata of a key-value store from the disk, creating a
+ * key-value metadata struct.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata to be retrieved, or NULL upon
+ *     error.
+ * @param kv_name The key-value store whose metadata will be retrieved.
+ * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_metadata_load(
+    tiledb_ctx_t* ctx, tiledb_kv_metadata_t** kv_metadata, const char* kv_name);
+
+/* ********************************* */
 /*         ATTRIBUTE ITERATOR        */
 /* ********************************* */
 
@@ -800,13 +905,26 @@ TILEDB_EXPORT int tiledb_array_metadata_dump(
  * Creates an attribute iterator for the input array metadata.
  *
  * @param ctx The TileDB context.
- * @param metadata The input array metadata.
+ * @param array_metadata The input array metadata.
  * @param attr_it The attribute iterator to be created.
  * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
  */
 TILEDB_EXPORT int tiledb_attribute_iter_create(
     tiledb_ctx_t* ctx,
-    const tiledb_array_metadata_t* metadata,
+    const tiledb_array_metadata_t* array_metadata,
+    tiledb_attribute_iter_t** attr_it);
+
+/**
+ * Creates an attribute iterator for the input key-value metadata.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The input key-value metadata.
+ * @param attr_it The attribute iterator to be created.
+ * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_attribute_iter_create(
+    tiledb_ctx_t* ctx,
+    const tiledb_kv_metadata_t* kv_metadata,
     tiledb_attribute_iter_t** attr_it);
 
 /**
@@ -1037,6 +1155,20 @@ TILEDB_EXPORT int tiledb_array_consolidate(
     tiledb_ctx_t* ctx, const char* array_name);
 
 /* ********************************* */
+/*          KEY-VALUE STORE          */
+/* ********************************* */
+
+/**
+ * Creates a new TileDB key-value store given an input metadata.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_metadata The key-value metadata.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_create(
+    tiledb_ctx_t* ctx, const tiledb_kv_metadata_t* kv_metadata);
+
+/* ********************************* */
 /*        RESOURCE MANAGEMENT        */
 /* ********************************* */
 
@@ -1100,6 +1232,28 @@ TILEDB_EXPORT int tiledb_walk(
     tiledb_walk_order_t order,
     int (*callback)(const char*, tiledb_object_t, void*),
     void* data);
+
+/* ********************************* */
+/*                KEY                */
+/* ********************************* */
+
+/**
+ * Sets a TileDB key to be used in a key-value store query.
+ *
+ * @param ctx The TileDB context.
+ * @param tiledb_key The TileDB key struct to be populated.
+ * @param key_type The key type.
+ * @param key_size The key size in bytes.
+ * @param key The key to be set. Note that `tiledb_key` will just store this
+ *     pointer - it will not copy the actual key payload.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_key_set(
+    tiledb_ctx_t* ctx,
+    tiledb_key_t* tiledb_key,
+    tiledb_datatype_t key_type,
+    uint64_t key_size,
+    void* key);
 
 #undef TILEDB_EXPORT
 #ifdef __cplusplus

@@ -32,6 +32,7 @@
  * tiledb_attribute_iter_t and tiledb_dimension_iter_t.
  */
 
+#include <constants.h>
 #include <unistd.h>
 #include <cassert>
 #include <cstring>
@@ -43,7 +44,7 @@
 #include "tiledb.h"
 #include "uri.h"
 
-struct ArraySchemaFx {
+struct ArrayMetadataFx {
 // Constant parameters
 #ifdef HAVE_HDFS
   const std::string URI_PREFIX = "hdfs://";
@@ -93,7 +94,7 @@ struct ArraySchemaFx {
   // TileDB context
   tiledb_ctx_t* ctx_;
 
-  ArraySchemaFx() {
+  ArrayMetadataFx() {
     // Error code
     int rc;
 
@@ -113,8 +114,8 @@ struct ArraySchemaFx {
     assert(rc == TILEDB_OK);
   }
 
-  ~ArraySchemaFx() {
-    // Free array_metadata metadata
+  ~ArrayMetadataFx() {
+    // Free array metadata
     if (array_metadata_ != nullptr)
       tiledb_array_metadata_free(ctx_, array_metadata_);
 
@@ -186,6 +187,13 @@ struct ArraySchemaFx {
     rc = tiledb_domain_add_dimension(
         ctx_, domain, DIM2_NAME, &DIM_DOMAIN[2], &TILE_EXTENTS[1]);
     REQUIRE(rc == TILEDB_OK);
+    rc = tiledb_domain_add_dimension(
+        ctx_,
+        domain,
+        tiledb::constants::key_type_attr_name,
+        &DIM_DOMAIN[2],
+        &TILE_EXTENTS[1]);
+    REQUIRE(rc != TILEDB_OK);  // Dimension has reserved name
     rc = tiledb_array_metadata_set_domain(ctx_, array_metadata_, domain);
     REQUIRE(rc == TILEDB_OK);
 
@@ -202,8 +210,17 @@ struct ArraySchemaFx {
     rc = tiledb_array_metadata_add_attribute(ctx_, array_metadata_, attr);
     REQUIRE(rc == TILEDB_OK);
 
+    // Add attribute with reserved name
+    tiledb_attribute_t* attr_r;
+    rc = tiledb_attribute_create(
+        ctx_, &attr_r, tiledb::constants::key_attr_name, ATTR_TYPE);
+    REQUIRE(rc == TILEDB_OK);
+    rc = tiledb_array_metadata_add_attribute(ctx_, array_metadata_, attr_r);
+    REQUIRE(rc != TILEDB_OK);
+
     // Clean up
     tiledb_attribute_free(ctx_, attr);
+    tiledb_attribute_free(ctx_, attr_r);
     tiledb_domain_free(ctx_, domain);
 
     // Create the array
@@ -213,12 +230,12 @@ struct ArraySchemaFx {
 };
 
 TEST_CASE_METHOD(
-    ArraySchemaFx,
+    ArrayMetadataFx,
     "C API: Test array metadata creation and retrieval",
-    "[metadata]") {
+    "[capi] [array metadata]") {
   create_dense_array();
 
-  // Load array_metadata metadata from the disk
+  // Load array metadata from the disk
   tiledb_array_metadata_t* array_metadata;
   int rc =
       tiledb_array_metadata_load(ctx_, &array_metadata, ARRAY_PATH.c_str());
@@ -248,7 +265,7 @@ TEST_CASE_METHOD(
   REQUIRE(rc == TILEDB_OK);
   CHECK(tile_order == TILE_ORDER);
 
-  // Check array_metadata type
+  // Check array type
   tiledb_array_type_t type;
   rc = tiledb_array_metadata_get_array_type(ctx_, array_metadata, &type);
   REQUIRE(rc == TILEDB_OK);
@@ -386,7 +403,7 @@ TEST_CASE_METHOD(
   // Check dump
   std::string dump_str =
       "- Array name: " + tiledb::URI(ARRAY_PATH).to_string() + "\n" +
-      "- Array type: " + ARRAY_TYPE_STR + "\n" +
+      "- Array type: " + ARRAY_TYPE_STR + "\n" + "- Key-value: false\n" +
       "- Cell order: " + CELL_ORDER_STR + "\n" +
       "- Tile order: " + TILE_ORDER_STR + "\n" + "- Capacity: " + CAPACITY_STR +
       "\n"

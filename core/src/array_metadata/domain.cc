@@ -132,11 +132,43 @@ Domain::~Domain() {
 
 Status Domain::add_dimension(
     const char* name, const void* domain, const void* tile_extent) {
+  // Check if a reseved name is used
+  if (constants::reserved_name(name))
+    return LOG_STATUS(
+        Status::DomainError("Cannot add dimension with reserved name"));
+
   auto dim = new Dimension(name, type_);
   RETURN_NOT_OK_ELSE(dim->set_domain(domain), delete dim);
   RETURN_NOT_OK_ELSE(dim->set_tile_extent(tile_extent), delete dim);
 
   dimensions_.emplace_back(dim);
+  ++dim_num_;
+
+  return Status::Ok();
+}
+
+Status Domain::add_kv_dimensions() {
+  // Set type
+  type_ = Datatype::UINT64;
+
+  uint64_t dim_domain[] = {0, UINT64_MAX};
+
+  // Dimension #1
+  auto dim_1 = new Dimension(constants::key_dim_1, Datatype::UINT64);
+  RETURN_NOT_OK_ELSE(dim_1->set_domain(dim_domain), delete dim_1);
+
+  // Dimension #1
+  auto dim_2 = new Dimension(constants::key_dim_2, Datatype::UINT64);
+  Status st = dim_2->set_domain(dim_domain);
+  if (!st.ok()) {
+    delete dim_1;
+    delete dim_2;
+    return st;
+  }
+
+  dimensions_.emplace_back(dim_1);
+  ++dim_num_;
+  dimensions_.emplace_back(dim_2);
   ++dim_num_;
 
   return Status::Ok();
@@ -431,7 +463,8 @@ Status Domain::init(Layout cell_order, Layout tile_order) {
   }
 
   // Compute number of cells per tile
-  compute_cell_num_per_tile();
+  if (tile_extents_ != nullptr)
+    compute_cell_num_per_tile();
 
   // Compute tile domain
   compute_tile_domain();
