@@ -189,8 +189,11 @@ typedef struct tiledb_domain_t tiledb_domain_t;
 /** A TileDB query. */
 typedef struct tiledb_query_t tiledb_query_t;
 
-/** A TileDB key used in key-value stores. */
-typedef struct tiledb_key_t tiledb_key_t;
+/** A TileDB structure storing keys used in key-value stores. */
+typedef struct tiledb_kv_keys_t tiledb_kv_keys_t;
+
+/** A TileDB key-value query. */
+typedef struct tiledb_kv_query_t tiledb_kv_query_t;
 
 /* ********************************* */
 /*              CONTEXT              */
@@ -1061,7 +1064,7 @@ TILEDB_EXPORT int tiledb_query_free(tiledb_ctx_t* ctx, tiledb_query_t* query);
  * @return TILEDB_OK for success and TILEDB_ERR for error.
  *
  * @note This function essentially opens the array associated with the query.
- *     Some bookkeeping structures are loaded in main-memory for this array.
+ *     Some metadata structures are loaded in main-memory for this array.
  *     In order to flush these data structures and free up memory, invoke
  *     *tiledb_query_free*.
  */
@@ -1077,7 +1080,7 @@ TILEDB_EXPORT int tiledb_query_submit(tiledb_ctx_t* ctx, tiledb_query_t* query);
  * @return TILEDB_OK for success and TILEDB_ERR for error.
  *
  * @note This function essentially opens the array associated with the query.
- *     Some bookkeeping structures are loaded in main-memory for this array.
+ *     Some metadata structures are loaded in main-memory for this array.
  *     In order to flush these data structures and free up memory, invoke
  *     *tiledb_query_free*.
  */
@@ -1155,20 +1158,6 @@ TILEDB_EXPORT int tiledb_array_consolidate(
     tiledb_ctx_t* ctx, const char* array_name);
 
 /* ********************************* */
-/*          KEY-VALUE STORE          */
-/* ********************************* */
-
-/**
- * Creates a new TileDB key-value store given an input metadata.
- *
- * @param ctx The TileDB context.
- * @param kv_metadata The key-value metadata.
- * @return TILEDB_OK for success and TILEDB_ERR for error.
- */
-TILEDB_EXPORT int tiledb_kv_create(
-    tiledb_ctx_t* ctx, const tiledb_kv_metadata_t* kv_metadata);
-
-/* ********************************* */
 /*        RESOURCE MANAGEMENT        */
 /* ********************************* */
 
@@ -1234,26 +1223,126 @@ TILEDB_EXPORT int tiledb_walk(
     void* data);
 
 /* ********************************* */
-/*                KEY                */
+/*          KEY-VALUE STORE          */
 /* ********************************* */
 
 /**
- * Sets a TileDB key to be used in a key-value store query.
+ * Creates a new TileDB key-value store given an input metadata.
  *
  * @param ctx The TileDB context.
- * @param tiledb_key The TileDB key struct to be populated.
- * @param key_type The key type.
- * @param key_size The key size in bytes.
- * @param key The key to be set. Note that `tiledb_key` will just store this
- *     pointer - it will not copy the actual key payload.
+ * @param kv_metadata The key-value metadata.
  * @return TILEDB_OK for success and TILEDB_ERR for error.
  */
-TILEDB_EXPORT int tiledb_key_set(
+TILEDB_EXPORT int tiledb_kv_create(
+    tiledb_ctx_t* ctx, const tiledb_kv_metadata_t* kv_metadata);
+
+/* ********************************* */
+/*                KEYS               */
+/* ********************************* */
+
+/**
+ * Creates a structure for storing keys to be used in a key-value store.
+ *
+ * @param ctx The TileDB context.
+ * @param keys The keys structure to be created.
+ * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_keys_create(
+    tiledb_ctx_t* ctx, tiledb_kv_keys_t** keys);
+
+/**
+ * Destroys the keys sturcture, freeing up memory.
+ *
+ * @param ctx The TileDB context.
+ * @param keys The keys structure to be destroyed.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_keys_free(
+    tiledb_ctx_t* ctx, tiledb_kv_keys_t* keys);
+
+/**
+ * Adds a key to the keys structure.
+ *
+ * @param ctx The TileDB context.
+ * @param keys The keys structure to add to.
+ * @param key The key to be added.
+ * @param type The type of the key.
+ * @param size The size (in bytes) of the key.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_keys_add(
     tiledb_ctx_t* ctx,
-    tiledb_key_t* tiledb_key,
-    tiledb_datatype_t key_type,
-    uint64_t key_size,
-    void* key);
+    tiledb_kv_keys_t* keys,
+    void* key,
+    tiledb_datatype_t type,
+    uint64_t size);
+
+/* ********************************* */
+/*          KEY-VALUE QUERY          */
+/* ********************************* */
+
+/**
+ * Creates a TileDB query object to be used in a key-value store.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_query The query object to be created.
+ * @param kv_name The name of the key-value store the query will focus on.
+ * @param type The query type, which must be one of the following:
+ *    - TILEDB_WRITE
+ *    - TILEDB_READ
+ * @param keys The keys to query on. In the case of writes, these are the
+ *     keys to be stored. There should be an one-to-one correspondence
+ *     between the keys and the attribute values in `buffers`. In the
+ *     case of reads, these will be the keys to query.
+ * @param attributes A subset of the attributes the read/write will be
+ *     constrained on.
+ * @param attribute_num The number of the input attributes. If *attributes* is
+ *     NULL, then this should be set to 0.
+ * @param buffers The buffers that either have the input data to be written,
+ *     or will hold the data to be read. There must be an one-to-one
+ *     correspondence with *attributes*.
+ * @param buffer_sizes There must be an one-to-one correspondence with
+ *     *buffers*. In the case of writes, they contain the sizes of *buffers*.
+ *     In the case of reads, they initially contain the allocated sizes of
+ *     *buffers*, but after the termination of the function they will contain
+ *     the sizes of the useful (read) data in the buffers.
+ * @return TILEDB_OK for success and TILEDB_OOM or TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_query_create(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_query_t** kv_query,
+    const char* kv_name,
+    tiledb_query_type_t type,
+    tiledb_kv_keys_t* keys,
+    const char** attributes,
+    unsigned int attribute_num,
+    void** buffers,
+    uint64_t* buffer_sizes);
+
+/**
+ * Deletes a TileDB key-value query object.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_query The query object to be deleted.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ */
+TILEDB_EXPORT int tiledb_kv_query_free(
+    tiledb_ctx_t* ctx, tiledb_kv_query_t* kv_query);
+
+/**
+ * Submits a key-value TileDB query.
+ *
+ * @param ctx The TileDB context.
+ * @param kv_query The key-value query to be submitted.
+ * @return TILEDB_OK for success and TILEDB_ERR for error.
+ *
+ * @note This function essentially opens the array associated with the query.
+ *     Some metadata structures are loaded in main-memory for this array.
+ *     In order to flush these data structures and free up memory, invoke
+ *     *tiledb_query_free*.
+ */
+TILEDB_EXPORT int tiledb_kv_query_submit(
+    tiledb_ctx_t* ctx, tiledb_kv_query_t* kv_query);
 
 #undef TILEDB_EXPORT
 #ifdef __cplusplus

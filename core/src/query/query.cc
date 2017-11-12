@@ -32,10 +32,8 @@
 
 #include "query.h"
 #include "logger.h"
-#include "md5/md5.h"
 #include "utils.h"
 
-#include <md5/md5.h>
 #include <sys/time.h>
 #include <sstream>
 
@@ -223,8 +221,7 @@ Status Query::init(
     QueryType type,
     Layout layout,
     const void* subarray,
-    const char** attributes,
-    unsigned int attribute_num,
+    const std::vector<unsigned int>& attribute_ids,
     void** buffers,
     uint64_t* buffer_sizes,
     const URI& consolidation_fragment_uri) {
@@ -237,8 +234,8 @@ Status Query::init(
   buffer_sizes_ = buffer_sizes;
   fragment_metadata_ = fragment_metadata;
   consolidation_fragment_uri_ = consolidation_fragment_uri;
+  attribute_ids_ = attribute_ids;
 
-  RETURN_NOT_OK(set_attributes(attributes, attribute_num));
   RETURN_NOT_OK(set_subarray(subarray));
   RETURN_NOT_OK(init_fragments(fragment_metadata_));
   RETURN_NOT_OK(init_states());
@@ -565,52 +562,7 @@ Status Query::open_fragments(const std::vector<FragmentMetadata*>& metadata) {
   return Status::Ok();
 }
 
-Status Query::set_attributes(
-    const char** attributes, unsigned int attribute_num) {
-  // Get attributes
-  std::vector<std::string> attributes_vec;
-  if (attributes == nullptr) {  // Default: all attributes
-    attributes_vec = array_metadata_->attribute_names();
-    if (array_metadata_->dense() &&
-        !(type_ == QueryType::WRITE && layout_ == Layout::UNORDERED))
-      // Remove coordinates attribute for dense arrays,
-      // unless in TILEDB_WRITE_UNSORTED mode
-      attributes_vec.pop_back();
-  } else {  // Custom attributes
-    // Get attributes
-    unsigned name_max_len = constants::name_max_len;
-    for (unsigned int i = 0; i < attribute_num; ++i) {
-      // Check attribute name length
-      if (attributes[i] == nullptr || strlen(attributes[i]) > name_max_len)
-        return LOG_STATUS(Status::QueryError("Invalid attribute name length"));
-      attributes_vec.emplace_back(attributes[i]);
-    }
-
-    // Sanity check on duplicates
-    if (utils::has_duplicates(attributes_vec))
-      return LOG_STATUS(Status::QueryError(
-          "Cannot initialize array metadata; Duplicate attributes"));
-  }
-
-  // Set attribute ids
-  RETURN_NOT_OK(
-      array_metadata_->get_attribute_ids(attributes_vec, attribute_ids_));
-
-  return Status::Ok();
-}
-
 Status Query::set_subarray(const void* subarray) {
-  // Special handling in the case of key-value stores
-  if (array_metadata_->is_kv()) {
-    // Ignore subarra in the case of writes
-    if (type_ == QueryType::WRITE)
-      return Status::Ok();
-
-    // In the case of reads, calculate hash subarray
-    if (type_ == QueryType::READ)
-      return set_subarray_as_hash(subarray);
-  }
-
   uint64_t subarray_size = 2 * array_metadata_->coords_size();
 
   if (subarray_ == nullptr)
@@ -624,38 +576,6 @@ Status Query::set_subarray(const void* subarray) {
     std::memcpy(subarray_, array_metadata_->domain()->domain(), subarray_size);
   else
     std::memcpy(subarray_, subarray, subarray_size);
-
-  return Status::Ok();
-}
-
-Status Query::set_subarray_as_hash(const void* subarray) {
-  assert(array_metadata_->is_kv());
-
-  // Allocate memory
-  uint64_t subarray_size = 2 * array_metadata_->coords_size();
-  if (subarray_ == nullptr)
-    subarray_ = malloc(subarray_size);
-  if (subarray_ == nullptr)
-    return LOG_STATUS(
-        Status::QueryError("Memory allocation for subarray failed"));
-
-  // Entire domain (all keys)
-  if (subarray == nullptr) {
-    std::memcpy(subarray_, array_metadata_->domain()->domain(), subarray_size);
-    return Status::Ok();
-  }
-
-  // Single key
-  auto subarray_c = (unsigned char*)subarray;
-  auto key = (void**)(subarray_c + sizeof(char) + sizeof(uint64_t));
-  uint64_t key_size;
-  memcpy(&key_size, subarray_c + sizeof(char), sizeof(uint64_t));
-  md5::MD5_CTX md5_ctx = {};
-  md5::MD5Init(&md5_ctx);
-  md5::MD5Update(&md5_ctx, subarray_c, sizeof(char) + sizeof(uint64_t));
-  md5::MD5Update(&md5_ctx, (unsigned char*)(*key), (int)key_size);
-  md5::MD5Final(&md5_ctx);
-  std::memcpy(subarray_, md5_ctx.digest, subarray_size);
 
   return Status::Ok();
 }

@@ -33,6 +33,8 @@
 
 #include "tiledb.h"
 #include "array_metadata.h"
+#include "keys.h"
+#include "kv_query.h"
 #include "query.h"
 #include "utils.h"
 
@@ -112,10 +114,12 @@ struct tiledb_query_t {
   tiledb::Query* query_;
 };
 
-struct tiledb_key_t {
-  tiledb::Datatype key_type_;
-  uint64_t key_size_;
-  void* key_;
+struct tiledb_kv_keys_t {
+  tiledb::Keys* keys_;
+};
+
+struct tiledb_kv_query_t {
+  tiledb::KVQuery* kv_query_;
 };
 
 /* ********************************* */
@@ -224,6 +228,23 @@ inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_domain_t* domain) {
 inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_query_t* query) {
   if (query == nullptr || query->query_ == nullptr) {
     save_error(ctx, tiledb::Status::Error("Invalid TileDB query struct"));
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_kv_keys_t* keys) {
+  if (keys == nullptr || keys->keys_ == nullptr) {
+    save_error(ctx, tiledb::Status::Error("Invalid TileDB keys struct"));
+    return TILEDB_ERR;
+  }
+  return TILEDB_OK;
+}
+
+inline int sanity_check(tiledb_ctx_t* ctx, const tiledb_kv_query_t* kv_query) {
+  if (kv_query == nullptr || kv_query->kv_query_ == nullptr) {
+    save_error(
+        ctx, tiledb::Status::Error("Invalid TileDB key-value query struct"));
     return TILEDB_ERR;
   }
   return TILEDB_OK;
@@ -1742,19 +1763,161 @@ int tiledb_kv_create(
   return TILEDB_OK;
 }
 
-int tiledb_key_set(
-    tiledb_ctx_t* ctx,
-    tiledb_key_t* tiledb_key,
-    tiledb_datatype_t key_type,
-    uint64_t key_size,
-    void* key) {
-  // Sanity checks
-  if (sanity_check(ctx))
+/* ********************************* */
+/*                KEYS               */
+/* ********************************* */
+
+int tiledb_kv_keys_create(tiledb_ctx_t* ctx, tiledb_kv_keys_t** keys) {
+  if (sanity_check(ctx) == TILEDB_ERR)
     return TILEDB_ERR;
 
-  tiledb_key->key_type_ = static_cast<tiledb::Datatype>(key_type);
-  tiledb_key->key_size_ = key_size;
-  tiledb_key->key_ = key;
+  // Create keys struct
+  *keys = (tiledb_kv_keys_t*)std::malloc(sizeof(tiledb_kv_keys_t));
+  if (*keys == nullptr) {
+    save_error(
+        ctx, tiledb::Status::Error("Failed to allocate TileDB keys struct"));
+    return TILEDB_OOM;
+  }
 
+  // Create a new Keys object
+  (*keys)->keys_ = new tiledb::Keys();
+  if ((*keys)->keys_ == nullptr) {
+    std::free(*keys);
+    *keys = nullptr;
+    save_error(
+        ctx,
+        tiledb::Status::Error("Failed to allocate TileDB keys "
+                              "object in struct"));
+    return TILEDB_OOM;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_kv_keys_free(tiledb_ctx_t* ctx, tiledb_kv_keys_t* keys) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, keys) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  delete keys->keys_;
+  std::free(keys);
+
+  return TILEDB_OK;
+}
+int tiledb_kv_keys_add(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_keys_t* keys,
+    void* key,
+    tiledb_datatype_t type,
+    uint64_t size) {
+  if (sanity_check(ctx) == TILEDB_ERR || sanity_check(ctx, keys) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create the key-value store
+  if (save_error(
+          ctx,
+          keys->keys_->add_key(key, static_cast<tiledb::Datatype>(type), size)))
+    return TILEDB_ERR;
+
+  return TILEDB_OK;
+}
+
+/* ********************************* */
+/*         KEY-VALUE QUERY           */
+/* ********************************* */
+
+int tiledb_kv_query_create(
+    tiledb_ctx_t* ctx,
+    tiledb_kv_query_t** kv_query,
+    const char* kv_name,
+    tiledb_query_type_t type,
+    tiledb_kv_keys_t* keys,
+    const char** attributes,
+    unsigned int attribute_num,
+    void** buffers,
+    uint64_t* buffer_sizes) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Create query struct
+  *kv_query = (tiledb_kv_query_t*)std::malloc(sizeof(tiledb_kv_query_t));
+  if (*kv_query == nullptr) {
+    save_error(
+        ctx,
+        tiledb::Status::Error(
+            "Failed to allocate TileDB key-value query struct"));
+    return TILEDB_OOM;
+  }
+
+  // Create a new Query object
+  (*kv_query)->kv_query_ = new tiledb::KVQuery();
+  if ((*kv_query)->kv_query_ == nullptr) {
+    std::free(*kv_query);
+    *kv_query = nullptr;
+    save_error(
+        ctx,
+        tiledb::Status::Error(
+            "Failed to allocate TileDB key-value query object in struct"));
+    return TILEDB_OOM;
+  }
+
+  // Create key-value query object
+  if (save_error(
+          ctx,
+          ctx->storage_manager_->kv_query_init(
+              ((*kv_query)->kv_query_),
+              kv_name,
+              static_cast<tiledb::QueryType>(type),
+              keys->keys_,
+              attributes,
+              attribute_num,
+              buffers,
+              buffer_sizes))) {
+    delete (*kv_query)->kv_query_;
+    std::free(*kv_query);
+    *kv_query = nullptr;
+    return TILEDB_ERR;
+  }
+
+  // Success
+  return TILEDB_OK;
+}
+
+int tiledb_kv_query_free(tiledb_ctx_t* ctx, tiledb_kv_query_t* kv_query) {
+  // Trivial case
+  if (kv_query == nullptr)
+    return TILEDB_OK;
+
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, kv_query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Finalize query and check error
+  int rc = TILEDB_OK;
+  if (save_error(
+          ctx, ctx->storage_manager_->kv_query_finalize(kv_query->kv_query_)))
+    rc = TILEDB_ERR;
+
+  // Clean up
+  delete kv_query->kv_query_;
+  std::free(kv_query);
+
+  return rc;
+}
+
+int tiledb_kv_query_submit(tiledb_ctx_t* ctx, tiledb_kv_query_t* kv_query) {
+  // Sanity check
+  if (sanity_check(ctx) == TILEDB_ERR ||
+      sanity_check(ctx, kv_query) == TILEDB_ERR)
+    return TILEDB_ERR;
+
+  // Submit query
+  if (save_error(
+          ctx, ctx->storage_manager_->kv_query_submit(kv_query->kv_query_)))
+    return TILEDB_ERR;
+
+  // Success
   return TILEDB_OK;
 }

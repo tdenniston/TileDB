@@ -44,6 +44,7 @@
 
 #include "array_metadata.h"
 #include "consolidator.h"
+#include "keys.h"
 #include "locked_array.h"
 #include "object_type.h"
 #include "open_array.h"
@@ -54,6 +55,8 @@
 #include "walk_order.h"
 
 namespace tiledb {
+
+class KVQuery;
 
 /** The storage manager that manages pretty much everything in TileDB. */
 class StorageManager {
@@ -190,6 +193,36 @@ class StorageManager {
    * @return Status
    */
   Status kv_create(ArrayMetadata* array_metadata);
+
+  /** Finalizes a key-value query. */
+  Status kv_query_finalize(KVQuery* kv_query);
+
+  /**
+   * Initializes a key-value query.
+   *
+   * @param query The query to initialize.
+   * @param kv_name The name of the key-value store the query targets at.
+   * @param type The query type.
+   * @param keys The keys involved in the query.
+   * @param attributes The attributes the query will be constrained on.
+   * @param attribute_num The number of attributes.
+   * @param buffers The buffers that will hold the cells to write, or will
+   *     hold the cells that will be read.
+   * @param buffer_sizes The corresponding buffer sizes.
+   * @return Status
+   */
+  Status kv_query_init(
+      KVQuery* query,
+      const char* kv_name,
+      QueryType type,
+      Keys* keys,
+      const char** attributes,
+      unsigned int attribute_num,
+      void** buffers,
+      uint64_t* buffer_sizes);
+
+  /** Submits a key-value query for (sync) execution. */
+  Status kv_query_submit(KVQuery* query);
 
   /**
    * Loads the metadata of an array from persistent storage into memory.

@@ -126,8 +126,7 @@ class Query {
    * @param layout The cell layout.
    * @param subarray The subarray the query is constrained on. A nuullptr
    *     indicates the full domain.
-   * @param attributes The names of the attributes involved in the query.
-   * @param attribute_num The number of attributes.
+   * @param attribute_ids The ids of the attributes involved in the query.
    * @param buffers The query buffers with a one-to-one correspondences with
    *     the specified attributes. In a read query, the buffers will be
    *     populated with the query results. In a write query, the buffer
@@ -145,11 +144,10 @@ class Query {
       QueryType type,
       Layout layout,
       const void* subarray,
-      const char** attributes,
-      unsigned int attribute_num,
+      const std::vector<unsigned int>& attribute_ids,
       void** buffers,
       uint64_t* buffer_sizes,
-      const URI& consolidation_fragment_uri = URI(""));
+      const URI& consolidation_fragment_uri);
 
   /**
    * Initializes the query. This is invoked for an internal async query.
@@ -184,7 +182,7 @@ class Query {
       const ArrayMetadata* array_metadata,
       const std::vector<FragmentMetadata*>& fragment_metadata,
       QueryType type,
-      Layout layoyt,
+      Layout layout,
       const void* subarray,
       const std::vector<unsigned int>& attribute_ids,
       void** buffers,
@@ -390,23 +388,8 @@ class Query {
    */
   Status open_fragments(const std::vector<FragmentMetadata*>& metadata);
 
-  /** Sets the query attributes. */
-  Status set_attributes(const char** attributes, unsigned int attribute_num);
-
   /** Sets the query subarray. */
   Status set_subarray(const void* subarray);
-
-  /**
-   * Applicable only to key-value stores.
-   *
-   * TileDB hashes th binary representation of `subarry` into a 16-byte MD5
-   * digest, and stores this as a 2-dimensional uint64_t subarray.
-   *
-   * @param subarray Has format:
-   *      key_type (char) | key_size (uint64_t) | key (key_size bytes)
-   * @return Status
-   */
-  Status set_subarray_as_hash(const void* subarray);
 
   /**
    * Sets the input buffer sizes to zero. The function assumes that the buffer

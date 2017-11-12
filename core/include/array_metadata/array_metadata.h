@@ -47,6 +47,7 @@
 #include "dimension.h"
 #include "domain.h"
 #include "layout.h"
+#include "query_type.h"
 #include "status.h"
 #include "uri.h"
 
@@ -178,6 +179,16 @@ class ArrayMetadata {
    * instance, this function will not print the array domain information.
    */
   void dump_as_kv(FILE* out) const;
+
+  /**
+   * Gets the attribute ids of the input attributes using the input
+   * array metadata and query type and layout.
+   */
+  Status get_attribute_ids(
+      QueryType type,
+      Layout layout,
+      const std::vector<std::string>& attributes,
+      std::vector<unsigned int>* attribute_ids) const;
 
   /**
    * Gets the ids of the input attributes.

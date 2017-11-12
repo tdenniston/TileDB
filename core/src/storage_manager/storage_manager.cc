@@ -34,6 +34,7 @@
 #include <blosc.h>
 #include <algorithm>
 
+#include "kv_query.h"
 #include "logger.h"
 #include "storage_manager.h"
 #include "utils.h"
@@ -274,6 +275,49 @@ Status StorageManager::kv_create(ArrayMetadata* array_metadata) {
   return Status::Ok();
 }
 
+Status StorageManager::kv_query_finalize(KVQuery* kv_query) {
+  return query_finalize(kv_query->query());
+}
+
+Status StorageManager::kv_query_init(
+    KVQuery* kv_query,
+    const char* kv_name,
+    QueryType type,
+    Keys* keys,
+    const char** attributes,
+    unsigned int attribute_num,
+    void** buffers,
+    uint64_t* buffer_sizes) {
+  // Open the underlying array
+  std::vector<FragmentMetadata*> fragment_metadata;
+  auto array_metadata = (const ArrayMetadata*)nullptr;
+  RETURN_NOT_OK(array_open(
+      URI(kv_name), type, nullptr, &array_metadata, &fragment_metadata));
+
+  // Initialize key-value query
+  return kv_query->init(
+      this,
+      array_metadata,
+      fragment_metadata,
+      type,
+      keys,
+      attributes,
+      attribute_num,
+      buffers,
+      buffer_sizes);
+}
+
+Status StorageManager::kv_query_submit(KVQuery* kv_query) {
+  auto query = kv_query->query();
+  QueryType query_type = query->type();
+
+  // TODO: check this for reads
+  if (query_type == QueryType::READ)
+    return query->read();
+
+  return query->write();
+}
+
 Status StorageManager::load(
     const std::string& array_name, ArrayMetadata* array_metadata) {
   URI array_uri = URI(array_name);
@@ -493,6 +537,17 @@ Status StorageManager::query_init(
   RETURN_NOT_OK(array_open(
       URI(array_name), type, subarray, &array_metadata, &fragment_metadata));
 
+  std::vector<std::string> attributes_vec;
+  if (attributes != nullptr) {
+    for (unsigned int i = 0; i < attribute_num; ++i)
+      attributes_vec.emplace_back(attributes[i]);
+  }
+
+  // Get attribute ids
+  std::vector<unsigned int> attribute_ids;
+  RETURN_NOT_OK(array_metadata->get_attribute_ids(
+      type, layout, attributes_vec, &attribute_ids));
+
   // Initialize query
   return query->init(
       this,
@@ -501,8 +556,7 @@ Status StorageManager::query_init(
       type,
       layout,
       subarray,
-      attributes,
-      attribute_num,
+      attribute_ids,
       buffers,
       buffer_sizes,
       consolidation_fragment_uri);

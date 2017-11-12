@@ -326,6 +326,35 @@ void ArrayMetadata::dump_as_kv(FILE* out) const {
 }
 
 Status ArrayMetadata::get_attribute_ids(
+    QueryType type,
+    Layout layout,
+    const std::vector<std::string>& attributes,
+    std::vector<unsigned int>* attribute_ids) const {
+  // Get attributes
+  std::vector<std::string> attributes_vec;
+  if (attributes.empty()) {  // Default: all attributes
+    attributes_vec = attribute_names();
+    // Remove coordinates attribute for dense array, unless in unordered mode
+    if (dense() && !(type == QueryType::WRITE && layout == Layout::UNORDERED))
+      attributes_vec.pop_back();
+  } else {  // Custom attributes
+    // Get attributes
+    for (auto& attr : attributes) {
+      // Check attribute name length
+      if (attr.empty())
+        return LOG_STATUS(Status::ArrayMetadataError(
+            "Cannot get attribute ids; Invalid attribute name"));
+      attributes_vec.emplace_back(attr);
+    }
+  }
+
+  // Set attribute ids
+  RETURN_NOT_OK(get_attribute_ids(attributes_vec, *attribute_ids));
+
+  return Status::Ok();
+}
+
+Status ArrayMetadata::get_attribute_ids(
     const std::vector<std::string>& attributes,
     std::vector<unsigned int>& attribute_ids) const {
   // Initialization
