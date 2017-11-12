@@ -35,6 +35,7 @@
  * $ ./tiledb_kv_write
  */
 
+#include <cstring>
 #include <tiledb.h>
 
 int main() {
