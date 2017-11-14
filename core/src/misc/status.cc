@@ -143,6 +143,9 @@ std::string Status::code_to_string() const {
     case StatusCode::Query:
       type = "[TileDB::Query] Error";
       break;
+    case StatusCode::KVQuery:
+      type = "[TileDB::KVQuery] Error";
+      break;
     case StatusCode::VFS:
       type = "[TileDB::VFS] Error";
       break;

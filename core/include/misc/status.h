@@ -94,6 +94,7 @@ enum class StatusCode : char {
   TileIO,
   Buffer,
   Query,
+  KVQuery,
   VFS,
   ConstBuffer,
   Dimension,
@@ -223,6 +224,11 @@ class Status {
   /** Return a QueryError error class Status with a given message **/
   static Status QueryError(const std::string& msg) {
     return Status(StatusCode::Query, msg, -1);
+  }
+
+  /** Return a KVQueryError error class Status with a given message **/
+  static Status KVQueryError(const std::string& msg) {
+    return Status(StatusCode::KVQuery, msg, -1);
   }
 
   /** Return a VFSError error class Status with a given message **/

@@ -90,6 +90,13 @@ class KVQuery {
   /** Returns the underlying array query. */
   Query* query() const;
 
+  /**
+   * Resets the sizes in the user buffers. This is important (mainly for
+   * reads), since the underlying array query never alters the user buffer
+   * sizes.
+   */
+  void reset_user_buffer_sizes();
+
  private:
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
@@ -110,6 +117,15 @@ class KVQuery {
   /** The underlying array query. */
   Query* query_;
 
+  /** The type of the query. */
+  QueryType type_;
+
+  /** The buffer sizes provided by the user for the query. */
+  uint64_t* user_buffer_sizes_;
+
+  /** Number of user buffer sizes provided. */
+  unsigned int user_buffer_sizes_num_;
+
   /* ********************************* */
   /*           PRIVATE METHODS         */
   /* ********************************* */
@@ -122,11 +138,19 @@ class KVQuery {
   Status compute_coords() const;
 
   /**
+   * (Applicable only to read queries)
+   * Computes a subarray query based on the MD5 digest of the input key.
+   *
+   * @param subarray The subarray to be created.
+   * @return Status
+   */
+  Status compute_subarray(void** subarray) const;
+
+  /**
    * Retrieves the ids of the attributes that will be involved in the
    * underlying array query.
    *
    * @param array_metadata The array metadata.
-   * @param type The query type.
    * @param attributes The attribute names inserted by the user.
    * @param attribute_num The number of attributes.
    * @param attribute_ids The attribute ids to be retrieved.
@@ -134,7 +158,6 @@ class KVQuery {
    */
   Status get_attribute_ids(
       const ArrayMetadata* array_metadata,
-      QueryType type,
       const char** attributes,
       unsigned int attribute_num,
       std::vector<unsigned int>* attribute_ids) const;

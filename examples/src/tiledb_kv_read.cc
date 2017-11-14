@@ -55,53 +55,46 @@ int main() {
                              sizeof(buffer_var_a2),
                              sizeof(buffer_a3)};
 
-  /*
-  // Prepare keys
+  // Prepare key
   tiledb_kv_keys_t* keys;
   tiledb_kv_keys_create(ctx, &keys);
-  int key_1 = 100;
-  tiledb_kv_keys_add(keys, &key_1, TILEDB_INT32, sizeof(int));
-  const char* key_4 = "key_4";
-  tiledb_kv_keys_add(keys, key_4, TILEDB_CHAR, strlen(key_4)+1);
+//  int key_1 = 100;
+//  tiledb_kv_keys_add(ctx, keys, &key_1, TILEDB_INT32, sizeof(int));
+//  float key_2 = 200.0;
+//  tiledb_kv_keys_add(ctx, keys, &key_2, TILEDB_FLOAT32, sizeof(float));
+  double key_3[2] = {300.0, 300.1};
+  tiledb_kv_keys_add(ctx, keys, key_3, TILEDB_FLOAT64, 2 * sizeof(double));
+//  char key_4[] = "key_4";
+//  tiledb_kv_keys_add(ctx, keys, key_4, TILEDB_CHAR, strlen(key_4) + 1);
 
   // Create query
   tiledb_kv_query_t* query;
   tiledb_kv_query_create(
       ctx,
-      &kv_query,
+      &query,
       "my_kv",
-      TILEDB_WRITE,
-      keys,  // TODO: set keys to get everything in user-defined buffers
+      TILEDB_READ,
+      keys,
       nullptr,
       0,
       buffers,
       buffer_sizes);
 
   // Submit query
-  tiledb_kv_query_submit(ctx, kv_query);
-
-  // Submit query
   tiledb_kv_query_submit(ctx, query);
 
-  // Print cell values
-  uint64_t result_num = buffer_sizes[0] / sizeof(int);
-  printf("result num: %llu\n\n", result_num);
-  printf("coords\t  a1\t   a2\t      (a3.first, a3.second)\n");
-  printf("---------------------------------------------------\n");
-  for (uint64_t i = 0; i < result_num; ++i) {
-    printf("(%lld, %lld)", buffer_coords[2 * i], buffer_coords[2 * i + 1]);
-    printf("\t %3d", buffer_a1[i]);
-    size_t var_size = (i != result_num - 1) ? buffer_a2[i + 1] - buffer_a2[i] :
-                                              buffer_sizes[2] - buffer_a2[i];
-    printf("\t %4.*s", int(var_size), &buffer_var_a2[buffer_a2[i]]);
-    printf("\t\t (%5.1f, %5.1f)\n", buffer_a3[2 * i], buffer_a3[2 * i + 1]);
-  }
+
+  // Print values
+  printf(" a1\t   a2\t      (a3.first, a3.second)\n");
+  printf("-----------------------------------------\n");
+  printf("%3d", buffer_a1[0]);
+  uint64_t var_size = buffer_sizes[2];
+  printf("\t %4.*s", int(var_size), &buffer_var_a2[0]);
+  printf("\t\t (%5.1f, %5.1f)\n", buffer_a3[0], buffer_a3[1]);
 
   // Clean up
   tiledb_kv_keys_free(ctx, keys);
   tiledb_kv_query_free(ctx, query);
-
-  */
   tiledb_ctx_free(ctx);
 
   return 0;

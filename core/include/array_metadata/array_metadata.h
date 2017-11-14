@@ -94,7 +94,7 @@ class ArrayMetadata {
   const Attribute* attribute(unsigned int id) const;
 
   /** Returns the name of the attribute with the input id. */
-  const std::string& attribute_name(unsigned id) const;
+  std::string attribute_name(unsigned id) const;
 
   /**
    * Returns the id of the input attribute.

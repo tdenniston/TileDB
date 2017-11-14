@@ -87,8 +87,9 @@ int main() {
   for (uint64_t i = 0; i < result_num; ++i) {
     printf("(%lld, %lld)", buffer_coords[2 * i], buffer_coords[2 * i + 1]);
     printf("\t %3d", buffer_a1[i]);
-    size_t var_size = (i != result_num - 1) ? buffer_a2[i + 1] - buffer_a2[i] :
-                                              buffer_sizes[2] - buffer_a2[i];
+    uint64_t var_size = (i != result_num - 1) ?
+                            buffer_a2[i + 1] - buffer_a2[i] :
+                            buffer_sizes[2] - buffer_a2[i];
     printf("\t %4.*s", int(var_size), &buffer_var_a2[buffer_a2[i]]);
     printf("\t\t (%5.1f, %5.1f)\n", buffer_a3[2 * i], buffer_a3[2 * i + 1]);
   }

@@ -33,7 +33,6 @@
 
 #include <blosc.h>
 #include <algorithm>
-
 #include "kv_query.h"
 #include "logger.h"
 #include "storage_manager.h"
@@ -311,11 +310,10 @@ Status StorageManager::kv_query_submit(KVQuery* kv_query) {
   auto query = kv_query->query();
   QueryType query_type = query->type();
 
-  // TODO: check this for reads
-  if (query_type == QueryType::READ)
-    return query->read();
+  Status st = (query_type == QueryType::READ) ? query->read() : query->write();
+  kv_query->reset_user_buffer_sizes();
 
-  return query->write();
+  return st;
 }
 
 Status StorageManager::load(

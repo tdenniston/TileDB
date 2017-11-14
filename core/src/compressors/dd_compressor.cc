@@ -182,11 +182,10 @@ Status DoubleDelta::compute_bitsize(T* in, uint64_t num, int* bitsize) {
     prev_delta = cur_delta;
   }
 
-  // Handle error
+  // If out-of-bounds, then the bitsize is the size of the type
   if (delta_out_of_bounds) {
-    return LOG_STATUS(
-        Status::CompressionError("Cannot compress with DoubleDelta; Some "
-                                 "negative double delta is out of bounds"));
+    *bitsize = 8 * sizeof(T);
+    return Status::Ok();
   }
 
   // Calculate bitsize of the maximum absolute double delta

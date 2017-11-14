@@ -45,8 +45,9 @@ KVQuery::KVQuery() {
 }
 
 KVQuery::~KVQuery() {
-  // Always the last buffer (coords) is created by this object
-  std::free(buffers_.back());
+  // In the case of writes, the last buffer (coords) is created by this object
+  if (type_ == QueryType::WRITE)
+    std::free(buffers_.back());
   delete query_;
 };
 
@@ -64,18 +65,18 @@ Status KVQuery::init(
     unsigned int attribute_num,
     void** buffers,
     uint64_t* buffer_sizes) {
-  // Set keys
+  // Set members
   keys_ = keys;
+  type_ = type;
 
   // Set layout and subarray
   Layout layout =
-      (type == QueryType::WRITE) ? Layout::UNORDERED : Layout::GLOBAL_ORDER;
-  void* subarray = nullptr;
+      (type_ == QueryType::WRITE) ? Layout::UNORDERED : Layout::GLOBAL_ORDER;
 
   // Get attribute ids
   std::vector<unsigned int> attribute_ids;
   RETURN_NOT_OK(get_attribute_ids(
-      array_metadata, type, attributes, attribute_num, &attribute_ids));
+      array_metadata, attributes, attribute_num, &attribute_ids));
 
   // Set buffers
   RETURN_NOT_OK(
@@ -85,10 +86,15 @@ Status KVQuery::init(
   if (type == QueryType::WRITE)
     RETURN_NOT_OK(compute_coords());
 
+  // Compute subarray
+  void* subarray = nullptr;
+  if (type == QueryType::READ)
+    RETURN_NOT_OK(compute_subarray(&subarray));
+
   // Initialize query
   delete query_;
   query_ = new Query();
-  return query_->init(
+  Status st = query_->init(
       storage_manager,
       array_metadata,
       fragment_metadata,
@@ -99,10 +105,21 @@ Status KVQuery::init(
       &buffers_[0],
       &buffer_sizes_[0],
       URI());
+
+  // Clean up
+  if (subarray != nullptr)
+    std::free(subarray);
+
+  return st;
 }
 
 Query* KVQuery::query() const {
   return query_;
+}
+
+void KVQuery::reset_user_buffer_sizes() {
+  for(unsigned int i=0; i<user_buffer_sizes_num_; ++i)
+    user_buffer_sizes_[i] = buffer_sizes_[i];
 }
 
 /* ****************************** */
@@ -137,9 +154,40 @@ Status KVQuery::compute_coords() const {
   return Status::Ok();
 }
 
+Status KVQuery::compute_subarray(void** subarray) const {
+  // Allocate memory
+  *subarray = malloc(4 * sizeof(uint64_t));
+  if (*subarray == nullptr)
+    return LOG_STATUS(
+        Status::KVQueryError("Failed to allocate memory for subarray"));
+
+  // Sanity check
+  if (keys_->key_num() != 1)
+    return LOG_STATUS(Status::KVQueryError(
+        "Cannot compute subarray; More than one keys provided"));
+
+  // For easy reference
+  auto keys_var = (unsigned char*)keys_->keys_var_data();
+  auto types = (unsigned char*)keys_->types_data();
+  auto keys_var_size = keys_->keys_var_size();
+
+  md5::MD5_CTX md5_ctx = {};
+  md5::MD5Init(&md5_ctx);
+  md5::MD5Update(&md5_ctx, types, sizeof(char));
+  md5::MD5Update(&md5_ctx, (unsigned char*)&keys_var_size, sizeof(uint64_t));
+  md5::MD5Update(&md5_ctx, keys_var, (unsigned int)keys_var_size);
+  md5::MD5Final(&md5_ctx);
+  auto s = (uint64_t*)*subarray;
+  std::memcpy(&s[0], md5_ctx.digest, sizeof(uint64_t));
+  std::memcpy(&s[1], md5_ctx.digest, sizeof(uint64_t));
+  std::memcpy(&s[2], md5_ctx.digest+sizeof(uint64_t), sizeof(uint64_t));
+  std::memcpy(&s[3], md5_ctx.digest+sizeof(uint64_t), sizeof(uint64_t));
+
+  return Status::Ok();
+}
+
 Status KVQuery::get_attribute_ids(
     const ArrayMetadata* array_metadata,
-    QueryType type,
     const char** attributes,
     unsigned int attribute_num,
     std::vector<unsigned int>* attribute_ids) const {
@@ -149,20 +197,26 @@ Status KVQuery::get_attribute_ids(
     for (unsigned int i = 0; i < attribute_num; ++i)
       attributes_vec.emplace_back(attributes[i]);
 
-    if (type == QueryType::WRITE) {
+    if (type_ == QueryType::WRITE) {
       attributes_vec.emplace_back(constants::key_attr_name);
       attributes_vec.emplace_back(constants::key_type_attr_name);
       attributes_vec.emplace_back(constants::coords);
     }
   } else {
     attributes_vec = array_metadata->attribute_names();
+
+    if (type_ == QueryType::READ) {
+      attributes_vec.pop_back();  // coords
+      attributes_vec.pop_back();  // key_type_attr_name
+      attributes_vec.pop_back();  // key_attr_name
+    }
   }
 
   // Get attribute ids
   Layout layout =
-      (type == QueryType::WRITE) ? Layout::UNORDERED : Layout::GLOBAL_ORDER;
+      (type_ == QueryType::WRITE) ? Layout::UNORDERED : Layout::GLOBAL_ORDER;
   return array_metadata->get_attribute_ids(
-      type, layout, attributes_vec, attribute_ids);
+      type_, layout, attributes_vec, attribute_ids);
 }
 
 Status KVQuery::set_buffers(
@@ -171,19 +225,17 @@ Status KVQuery::set_buffers(
     void** buffers,
     uint64_t* buffer_sizes) {
   // Prepare buffers
-  std::vector<void*> new_buffers;
-  std::vector<uint64_t> new_buffer_sizes;
   unsigned int buff_i = 0;
   for (auto& attr_id : attribute_ids) {
-    auto& attr_name = array_metadata->attribute_name(attr_id);
+    auto attr_name = array_metadata->attribute_name(attr_id);
     if (attr_name == constants::key_attr_name) {
-      new_buffer_sizes.emplace_back(keys_->keys_size());
-      new_buffers.emplace_back(keys_->keys_data());
-      new_buffer_sizes.emplace_back(keys_->keys_var_size());
-      new_buffers.emplace_back(keys_->keys_var_data());
+      buffer_sizes_.emplace_back(keys_->keys_size());
+      buffers_.emplace_back(keys_->keys_data());
+      buffer_sizes_.emplace_back(keys_->keys_var_size());
+      buffers_.emplace_back(keys_->keys_var_data());
     } else if (attr_name == constants::key_type_attr_name) {
-      new_buffer_sizes.emplace_back(keys_->types_size());
-      new_buffers.emplace_back(keys_->types_data());
+      buffer_sizes_.emplace_back(keys_->types_size());
+      buffers_.emplace_back(keys_->types_data());
     } else if (attr_name == constants::coords) {
       uint64_t coords_buff_size =
           keys_->key_num() * array_metadata->coords_size();
@@ -191,17 +243,21 @@ Status KVQuery::set_buffers(
       if (coords_buff == nullptr)
         return LOG_STATUS(Status::StorageManagerError(
             "Failed to allocate coordinates buffer"));
-      new_buffer_sizes.emplace_back(coords_buff_size);
-      new_buffers.emplace_back(coords_buff);
+      buffer_sizes_.emplace_back(coords_buff_size);
+      buffers_.emplace_back(coords_buff);
     } else {
-      new_buffer_sizes.emplace_back(buffer_sizes[buff_i]);
-      new_buffers.emplace_back(buffers[buff_i++]);
+      buffer_sizes_.emplace_back(buffer_sizes[buff_i]);
+      buffers_.emplace_back(buffers[buff_i++]);
       if (array_metadata->var_size(attr_id)) {
-        new_buffer_sizes.emplace_back(buffer_sizes[buff_i]);
-        new_buffers.emplace_back(buffers[buff_i++]);
+        buffer_sizes_.emplace_back(buffer_sizes[buff_i]);
+        buffers_.emplace_back(buffers[buff_i++]);
       }
     }
   }
+
+  // Set user buffer sizes
+  user_buffer_sizes_ = buffer_sizes;
+  user_buffer_sizes_num_ = buff_i;
 
   return Status::Ok();
 }
