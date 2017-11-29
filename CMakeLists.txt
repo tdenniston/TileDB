@@ -102,6 +102,12 @@ enable_testing()
 # Build TileDB library
 add_subdirectory(core)
 
+# Build the ingestors if "ingestors" subdirectory is present.
+if(EXISTS "${CMAKE_SOURCE_DIR}/ingestors")
+  message(STATUS "The TileDB ingestors are built.")
+  add_subdirectory(ingestors)
+endif()
+
 # Build examples
 add_subdirectory(examples)
 
