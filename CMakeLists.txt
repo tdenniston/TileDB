@@ -66,7 +66,7 @@ set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${BZIP2_LIBRARIES})
 if(USE_HDFS)
   find_package(LIBJVM REQUIRED)
   set(TILEDB_LIB_DEPENDENCIES ${TILEDB_LIB_DEPENDENCIES} ${LIBJVM_LIBRARIES})
-  
+
   find_package(LIBHDFS REQUIRED)
   include_directories(${LIBHDFS_INCLUDE_DIR})
   # This variable is defined in FindJNI module included in the FindHDFS.cmake file
@@ -77,7 +77,7 @@ endif()
 include(SetCXX2011Flag REQUIRED)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG 
+set(CMAKE_CXX_FLAGS_DEBUG
     "-DDEBUG -g3 -ggdb3 -gdwarf-3 -Wall -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS_COVERAGE "-DDEBUG -g3 -gdwarf-3 --coverage")
@@ -141,13 +141,13 @@ if(DOXYGEN_FOUND)
   add_custom_command(
      OUTPUT ${CMAKE_BINARY_DIR}/doxyfile.in
       COMMAND mkdir -p doxygen
-      COMMAND echo INPUT = ${CMAKE_SOURCE_DIR}/doc/mainpage.dox 
+      COMMAND echo INPUT = ${CMAKE_SOURCE_DIR}/doc/mainpage.dox
               ${TILEDB_CORE_HEADERS} > ${CMAKE_BINARY_DIR}/doxyfile.in
       COMMAND echo FILE_PATTERNS = *.h >> ${CMAKE_BINARY_DIR}/doxyfile.in
       COMMENT "Preparing for Doxygen documentation" VERBATIM
   )
   add_custom_target(
-      doc ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/doc/Doxyfile.mk > 
+      doc ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/doc/Doxyfile.mk >
           ${CMAKE_BINARY_DIR}/Doxyfile.log 2>&1
       COMMENT "Generating API documentation with Doxygen" VERBATIM
       DEPENDS ${CMAKE_BINARY_DIR}/doxyfile.in
@@ -157,9 +157,9 @@ endif(DOXYGEN_FOUND)
 ###########################################################
 # Uninstall
 ###########################################################
-set(CMD "xargs printf '-- Uninstalling: %s\\\\n' <install_manifest.txt") 
+set(CMD "xargs printf '-- Uninstalling: %s\\\\n' <install_manifest.txt")
 add_custom_target(
-   uninstall 
+   uninstall
    COMMAND echo "Uninstalling TileDB..."
    COMMAND eval "${CMD}"
    COMMAND xargs rm -f < install_manifest.txt
