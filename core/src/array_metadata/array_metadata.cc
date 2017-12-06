@@ -36,8 +36,6 @@
 #include "logger.h"
 
 #include <cassert>
-#include <cinttypes>
-#include <cmath>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -124,7 +122,7 @@ const Attribute* ArrayMetadata::attribute(unsigned int id) const {
 
 const std::string& ArrayMetadata::attribute_name(
     unsigned int attribute_id) const {
-  assert(attribute_id >= 0 && attribute_id <= attribute_num_ + 1);
+  assert(attribute_id <= attribute_num_ + 1);
 
   // Special case for the search attribute (same as coordinates)
   if (attribute_id == attribute_num_ + 1)
@@ -200,10 +198,14 @@ Status ArrayMetadata::check() const {
     return LOG_STATUS(Status::ArrayMetadataError(
         "Array metadata check failed; Invalid array URI"));
 
-  if (domain_ == nullptr) {
+  if (domain_ == nullptr)
     return LOG_STATUS(Status::ArrayMetadataError(
         "Array metadata check failed; Domain not set"));
-  }
+
+  if (array_type_ == ArrayType::DENSE && domain_->null_tile_extents())
+    return LOG_STATUS(
+        Status::ArrayMetadataError("Array metadata check failed; Dense arrays "
+                                   "should not have null tile extents"));
 
   if (dim_num() == 0)
     return LOG_STATUS(Status::ArrayMetadataError(
@@ -228,7 +230,7 @@ Status ArrayMetadata::check() const {
 }
 
 Compressor ArrayMetadata::compression(unsigned int attr_id) const {
-  assert(attr_id >= 0 && attr_id <= attribute_num_ + 1);
+  assert(attr_id <= attribute_num_ + 1);
 
   if (attr_id == attribute_num_ + 1)
     return coords_compression_;
@@ -237,7 +239,7 @@ Compressor ArrayMetadata::compression(unsigned int attr_id) const {
 }
 
 int ArrayMetadata::compression_level(unsigned int attr_id) const {
-  assert(attr_id >= 0 && attr_id <= attribute_num_ + 1);
+  assert(attr_id <= attribute_num_ + 1);
 
   if (attr_id == attribute_num_ + 1)
     return coords_compression_level_;
@@ -377,7 +379,7 @@ Layout ArrayMetadata::tile_order() const {
 Datatype ArrayMetadata::type(unsigned int i) const {
   if (i > attribute_num_) {
     LOG_ERROR("Cannot retrieve type; Invalid attribute id");
-    assert(0);
+    assert(false);
   }
 
   if (i < attribute_num_)
@@ -490,6 +492,9 @@ Status ArrayMetadata::init() {
   // Perform check of all members
   RETURN_NOT_OK(check());
 
+  // Initialize domain
+  RETURN_NOT_OK(domain_->init(cell_order_, tile_order_));
+
   // Set cell sizes
   cell_sizes_.resize(attribute_num_ + 1);
   for (unsigned int i = 0; i <= attribute_num_; ++i)
@@ -497,8 +502,6 @@ Status ArrayMetadata::init() {
 
   auto dim_num = domain_->dim_num();
   coords_size_ = dim_num * datatype_size(coords_type());
-
-  RETURN_NOT_OK(domain_->init(cell_order_, tile_order_));
 
   // Success
   return Status::Ok();
@@ -661,7 +664,6 @@ uint64_t ArrayMetadata::compute_cell_size(unsigned int i) const {
     else if (type == Datatype::UINT64)
       size = dim_num * sizeof(uint64_t);
   }
-
   return size;
 }
 
