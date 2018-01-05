@@ -631,6 +631,24 @@ Status ArrayOrderedReadState::async_submit_query(unsigned int id) {
     RETURN_NOT_OK(async_query_[id]->finalize());
   delete async_query_[id];
   async_query_[id] = new Query();
+
+  bool add_coords = false;
+  {
+    int buffer_i = 0;
+    auto attribute_id_num = attribute_ids_.size();
+    auto attribute_num = query_->array_metadata()->attribute_num();
+    for (size_t i = 0; i < attribute_id_num; ++i) {
+      if (attribute_ids_[i] == attribute_num) {
+        add_coords = true;
+        break;
+      }
+      if (!query_->array_metadata()->var_size(attribute_ids_[i]))  // FIXED CELLS
+        ++buffer_i;
+      else  // VARIABLE-SIZED CELLS
+        buffer_i += 2;
+    }
+  }
+
   RETURN_NOT_OK(async_query_[id]->init(
       query_->storage_manager(),
       query_->array_metadata(),
@@ -641,7 +659,7 @@ Status ArrayOrderedReadState::async_submit_query(unsigned int id) {
       query_->attribute_ids(),
       buffers_[id],
       buffer_sizes_tmp_[id],
-      true));
+      add_coords));
   async_query_[id]->set_callback(async_done, &(async_data_[id]));
 
   // Send the async query
